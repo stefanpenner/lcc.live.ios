@@ -25,26 +25,73 @@ class ImagePreloader: ObservableObject {
     }
 }
 
+struct FullScreenImageView: View {
+    let image: UIImage
+    @Environment(\.dismiss) var dismiss
+    @State private var scale: CGFloat = 1.0
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.black.edgesIgnoringSafeArea(.all)
+                
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .scaleEffect(scale)
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { value in
+                                scale = value
+                            }
+                            .onEnded { _ in
+                                withAnimation {
+                                    scale = 1.0
+                                }
+                            }
+                    )
+            }
+        }
+        .overlay(
+            Button(action: {
+                dismiss()
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 30))
+                    .foregroundColor(.white)
+                    .padding()
+            }
+            .padding()
+            , alignment: .topTrailing
+        )
+        .statusBar(hidden: true)
+    }
+}
+
 struct PhotoTabView: View {
     let images: [String]
     let title: String
     let icon: String
     @StateObject private var preloader = ImagePreloader()
     @Environment(\.colorScheme) var colorScheme
+    @State private var selectedImage: UIImage? = nil
+    @State private var isShowingFullScreen = false
     
     var body: some View {
         GeometryReader { geometry in
-            let isLandscape = geometry.size.width > geometry.size.height
-            let columns = [
-                GridItem(.flexible(), spacing: 20),
-                isLandscape ? GridItem(.flexible(), spacing: 20) : nil
-            ].compactMap { $0 }
+            let minImageWidth: CGFloat = 340
+            let spacing: CGFloat = 20
+            let availableWidth = geometry.size.width - (spacing * 2)
             
-            let imageWidth = min(max(geometry.size.width * 0.95, 340), 600)
+            let maxColumns = max(1, Int(availableWidth / minImageWidth))
+            let imageWidth = max(minImageWidth, (availableWidth - (spacing * CGFloat(maxColumns - 1))) / CGFloat(maxColumns))
             let imageHeight = imageWidth * 0.6
             
+            let columns = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: maxColumns)
+            
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 20) {
+                LazyVGrid(columns: columns, spacing: spacing) {
                     ForEach(images, id: \.self) { imageUrl in
                         if let url = URL(string: imageUrl),
                            let preloadedImage = preloader.loadedImages[url] {
@@ -56,6 +103,10 @@ struct PhotoTabView: View {
                                 .frame(width: imageWidth, height: imageHeight)
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                                 .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                                .onTapGesture {
+                                    selectedImage = preloadedImage
+                                    isShowingFullScreen = true
+                                }
                         } else {
                             AsyncImage(url: URL(string: imageUrl)) { phase in
                                 switch phase {
@@ -114,6 +165,11 @@ struct PhotoTabView: View {
         .tabItem {
             Label(title, systemImage: icon)
         }
+        .fullScreenCover(isPresented: $isShowingFullScreen, content: {
+            if let image = selectedImage {
+                FullScreenImageView(image: image)
+            }
+        })
     }
 }
 
