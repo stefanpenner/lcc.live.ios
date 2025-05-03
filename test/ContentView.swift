@@ -15,10 +15,14 @@ class ImagePreloader: ObservableObject {
             guard let url = URL(string: urlString) else { continue }
             
             URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-                guard let data = data, let image = UIImage(data: data) else { return }
+                guard let data = data, let image = UIImage(data: data) else {
+                    print("Failed to load image from URL: \(urlString)")
+                    return
+                }
                 
                 DispatchQueue.main.async {
                     self?.loadedImages[url] = image
+                    print("Successfully loaded image: \(urlString)")
                 }
             }.resume()
         }
@@ -34,11 +38,15 @@ struct FullScreenImageView: View {
         GeometryReader { geometry in
             ZStack {
                 Color.black.edgesIgnoringSafeArea(.all)
+                    .onTapGesture {
+                        dismiss()
+                    }
                 
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
+                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                     .scaleEffect(scale)
                     .gesture(
                         MagnificationGesture()
@@ -51,15 +59,21 @@ struct FullScreenImageView: View {
                                 }
                             }
                     )
+                    .onAppear {
+                        print("FullScreenImageView appeared with image size: \(image.size)")
+                        print("Geometry size: \(geometry.size)")
+                    }
             }
         }
         .overlay(
             Button(action: {
+                print("Dismiss button tapped")
                 dismiss()
             }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 30))
                     .foregroundColor(.white)
+                    .background(Circle().fill(Color.black.opacity(0.5)))
                     .padding()
             }
             .padding()
@@ -73,6 +87,7 @@ struct PhotoTabView: View {
     let images: [String]
     let title: String
     let icon: String
+    
     @StateObject private var preloader = ImagePreloader()
     @Environment(\.colorScheme) var colorScheme
     @State private var selectedImage: UIImage? = nil
@@ -103,9 +118,14 @@ struct PhotoTabView: View {
                                 .frame(width: imageWidth, height: imageHeight)
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                                 .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                                .contentShape(Rectangle())
                                 .onTapGesture {
+                                    print("Tapped image with URL: \(imageUrl)")
+                                    print("Preloaded images count: \(preloader.loadedImages.count)")
                                     selectedImage = preloadedImage
+                                    print("Set selectedImage to image with size: \(preloadedImage.size)")
                                     isShowingFullScreen = true
+                                    print("Set isShowingFullScreen to true")
                                 }
                         } else {
                             AsyncImage(url: URL(string: imageUrl)) { phase in
@@ -160,16 +180,32 @@ struct PhotoTabView: View {
             }
         }
         .onAppear {
+            print("PhotoTabView appeared, starting to preload \(images.count) images")
             preloader.preloadImages(from: images)
+        }
+        .onChange(of: selectedImage) { newValue in
+            print("selectedImage changed to:")
+        }
+        .onChange(of: isShowingFullScreen) { newValue in
+            print("isShowingFullScreen changed to: \(newValue)")
+            print("selectedImage at time of fullScreen change: ")
         }
         .tabItem {
             Label(title, systemImage: icon)
         }
-        .fullScreenCover(isPresented: $isShowingFullScreen, content: {
+        .fullScreenCover(isPresented: $isShowingFullScreen) {
             if let image = selectedImage {
                 FullScreenImageView(image: image)
+                    .onAppear {
+                        print("FullScreenImageView appeared")
+                    }
+            } else {
+                Text("Hello World")
+                    .onTapGesture {
+                        isShowingFullScreen = false
+                    }
             }
-        })
+        }
     }
 }
 
