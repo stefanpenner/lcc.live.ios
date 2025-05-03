@@ -90,8 +90,13 @@ struct PhotoTabView: View {
     
     @StateObject private var preloader = ImagePreloader()
     @Environment(\.colorScheme) var colorScheme
-    @State private var selectedImage: UIImage? = nil
-    @State private var isShowingFullScreen = false
+    
+    enum FullScreenState {
+        case hidden
+        case showing(UIImage)
+    }
+    
+    @State private var fullScreenState: FullScreenState = .hidden
     
     var body: some View {
         GeometryReader { geometry in
@@ -120,12 +125,7 @@ struct PhotoTabView: View {
                                 .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
-                                    print("Tapped image with URL: \(imageUrl)")
-                                    print("Preloaded images count: \(preloader.loadedImages.count)")
-                                    selectedImage = preloadedImage
-                                    print("Set selectedImage to image with size: \(preloadedImage.size)")
-                                    isShowingFullScreen = true
-                                    print("Set isShowingFullScreen to true")
+                                    fullScreenState = .showing(preloadedImage)
                                 }
                         } else {
                             AsyncImage(url: URL(string: imageUrl)) { phase in
@@ -145,11 +145,7 @@ struct PhotoTabView: View {
                                             )
                                         )
                                 case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: imageWidth, height: imageHeight)
-                                        .clipped()
+                                    EmptyView()
                                 case .failure:
                                     Image(systemName: "photo")
                                         .resizable()
@@ -183,27 +179,24 @@ struct PhotoTabView: View {
             print("PhotoTabView appeared, starting to preload \(images.count) images")
             preloader.preloadImages(from: images)
         }
-        .onChange(of: selectedImage) { newValue in
-            print("selectedImage changed to:")
-        }
-        .onChange(of: isShowingFullScreen) { newValue in
-            print("isShowingFullScreen changed to: \(newValue)")
-            print("selectedImage at time of fullScreen change: ")
-        }
         .tabItem {
             Label(title, systemImage: icon)
         }
-        .fullScreenCover(isPresented: $isShowingFullScreen) {
-            if let image = selectedImage {
+        .fullScreenCover(isPresented: Binding(
+            get: {
+                if case .showing = fullScreenState {
+                    return true
+                }
+                return false
+            },
+            set: { newValue in
+                if !newValue {
+                    fullScreenState = .hidden
+                }
+            }
+        )) {
+            if case .showing(let image) = fullScreenState {
                 FullScreenImageView(image: image)
-                    .onAppear {
-                        print("FullScreenImageView appeared")
-                    }
-            } else {
-                Text("Hello World")
-                    .onTapGesture {
-                        isShowingFullScreen = false
-                    }
             }
         }
     }
