@@ -37,40 +37,103 @@ struct ContentView: View {
     @State private var selectedTab = 0
     @State private var refreshImagesTrigger = 0
     @Environment(\.scenePhase) private var scenePhase
+    @State private var isAnyFullScreen: Bool = false
+    // Grid mode toggle state (now global)
+    @State var gridMode: PhotoTabView.GridMode = .compact
+    @State private var isToggleVisible: Bool = true
+    @State private var lastScrollDate: Date = Date()
+    @State private var showFloatingButton: Bool = false
+    private let toggleFadeDuration: Double = 0.25
+    private let toggleHideDelay: Double = 1.0
+    private let floatingButtonSize: CGFloat = 36
+    private let floatingButtonPadding: CGFloat = 12
+    private var gridIcon: String { "square.grid.2x2" }
+    private var toggleAnimation: Animation { .easeInOut(duration: toggleFadeDuration) }
+
+    // Tab info for custom tab bar
+    private let tabs: [(title: String, icon: String)] = [
+        ("lcc", "mountain.2"),
+        ("bcc", "mountain.2")
+    ]
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            PhotoTabView(
-                images: lccImages,
-                title: "lcc",
-                icon: "mountain.2",
-                refreshImagesTrigger: refreshImagesTrigger,
+        ZStack(alignment: .bottom) {
+            TabView(selection: $selectedTab) {
+                PhotoTabView(
+                    images: lccImages,
+                    title: "lcc",
+                    icon: "mountain.2",
+                    refreshImagesTrigger: refreshImagesTrigger,
+                    selectedTab: $selectedTab,
+                    tabIndex: 0,
+                    tabCount: 2,
+                    isFullScreen: $isAnyFullScreen,
+                    gridMode: $gridMode,
+                    isToggleVisible: $isToggleVisible,
+                    lastScrollDate: $lastScrollDate,
+                    showFloatingButton: $showFloatingButton,
+                    toggleAnimation: toggleAnimation,
+                    toggleHideDelay: toggleHideDelay
+                )
+                .tag(0)
+                PhotoTabView(
+                    images: bccImages,
+                    title: "bcc",
+                    icon: "mountain.2",
+                    refreshImagesTrigger: refreshImagesTrigger,
+                    selectedTab: $selectedTab,
+                    tabIndex: 1,
+                    tabCount: 2,
+                    isFullScreen: $isAnyFullScreen,
+                    gridMode: $gridMode,
+                    isToggleVisible: $isToggleVisible,
+                    lastScrollDate: $lastScrollDate,
+                    showFloatingButton: $showFloatingButton,
+                    toggleAnimation: toggleAnimation,
+                    toggleHideDelay: toggleHideDelay
+                )
+                .tag(1)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .allowsHitTesting(!isAnyFullScreen)
+            ModernTabBar(
+                tabs: tabs,
                 selectedTab: $selectedTab,
-                tabIndex: 0,
-                tabCount: 2
+                isAnyFullScreen: isAnyFullScreen
             )
-            .tag(0)
-            PhotoTabView(
-                images: bccImages,
-                title: "bcc",
-                icon: "mountain.2",
-                refreshImagesTrigger: refreshImagesTrigger,
-                selectedTab: $selectedTab,
-                tabIndex: 1,
-                tabCount: 2
-            )
-            .tag(1)
+            // Floating grid mode toggle/floating button always overlays content
+            if !isAnyFullScreen {
+                GridModeToggle(
+                    gridMode: $gridMode,
+                    isToggleVisible: $isToggleVisible,
+                    showFloatingButton: $showFloatingButton,
+                    toggleAnimation: toggleAnimation,
+                    floatingButtonSize: floatingButtonSize,
+                    floatingButtonPadding: floatingButtonPadding,
+                    gridIcon: gridIcon
+                )
+                .zIndex(2)
+            }
         }
-        .tabViewStyle(.automatic)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onChange(of: selectedTab) { _ in
             refreshImagesTrigger += 1
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
-                refreshImagesTrigger += 1
-            }
+                    refreshImagesTrigger += 1
+                }
         }
     }
+}
+
+// Helper for blur background
+struct BlurView: UIViewRepresentable {
+    var style: UIBlurEffect.Style
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        UIVisualEffectView(effect: UIBlurEffect(style: style))
+    }
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
 }
 
 #Preview {

@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import Foundation
 
 struct PhotoTabView: View {
     let images: [String]
@@ -9,6 +10,7 @@ struct PhotoTabView: View {
     @Binding var selectedTab: Int
     let tabIndex: Int
     let tabCount: Int
+    @Binding var isFullScreen: Bool
 
     @StateObject private var preloader = ImagePreloader()
     @Environment(\.colorScheme) var colorScheme
@@ -23,12 +25,12 @@ struct PhotoTabView: View {
     @State private var isRefreshing = false
 
     // User grid mode
-    private enum GridMode: String, CaseIterable, Identifiable {
+    public enum GridMode: String, CaseIterable, Identifiable {
         case compact = "Compact"
         case single = "Single"
         var id: String { rawValue }
     }
-    @State private var gridMode: GridMode = .compact
+    @Binding public var gridMode: GridMode
 
     // Add enum for image size
     private enum ImageSizeCategory {
@@ -56,15 +58,11 @@ struct PhotoTabView: View {
         }
     }
 
-    @State private var isToggleVisible: Bool = true
-    @State private var lastScrollDate: Date = Date()
-    @State private var showFloatingButton: Bool = false
-    private let toggleFadeDuration: Double = 0.25
-    private let toggleHideDelay: Double = 1.0
-    private let floatingButtonSize: CGFloat = 36
-    private let floatingButtonPadding: CGFloat = 12
-    private var gridIcon: String { "square.grid.2x2" }
-    private var toggleAnimation: Animation { .easeInOut(duration: toggleFadeDuration) }
+    @Binding var isToggleVisible: Bool
+    @Binding var lastScrollDate: Date
+    @Binding var showFloatingButton: Bool
+    var toggleAnimation: Animation
+    var toggleHideDelay: Double
 
     // Scroll offset preference key
     private struct ScrollOffsetPreferenceKey: PreferenceKey {
@@ -78,33 +76,13 @@ struct PhotoTabView: View {
         ZStack(alignment: .topTrailing) {
             GeometryReader { geometry in
                 let availableWidth = geometry.size.width - (spacing * 2)
-                let (columns, imageWidth, imageHeight, gridItems): (Int, CGFloat, CGFloat, [GridItem]) = {
-                    let isLandscape = geometry.size.width > geometry.size.height
-                    switch gridMode {
-                    case .compact:
-                        let compactColumns = max(2, min(4, Int(availableWidth / 220)))
-                        let imageWidth = (availableWidth - (CGFloat(compactColumns - 1) * spacing)) / CGFloat(compactColumns)
-                        let imageHeight = imageWidth * 0.7
-                        let gridItems = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: compactColumns)
-                        return (compactColumns, imageWidth, imageHeight, gridItems)
-                    case .single:
-                        let maxSingleWidth: CGFloat = 430
-                        if isLandscape {
-                            let columns = 2
-                            let totalSpacing = spacing
-                            let imageWidth = min((availableWidth - totalSpacing) / 2, maxSingleWidth)
-                            let imageHeight = imageWidth * 0.7
-                            let gridItems = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: columns)
-                            return (columns, imageWidth, imageHeight, gridItems)
-                        } else {
-                            let columns = 1
-                            let imageWidth = min(availableWidth, maxSingleWidth)
-                            let imageHeight = imageWidth * 0.7
-                            let gridItems = [GridItem(.fixed(imageWidth), spacing: spacing)]
-                            return (columns, imageWidth, imageHeight, gridItems)
-                        }
-                    }
-                }()
+                let (columns, imageWidth, imageHeight) = calculateGridLayout(
+                    availableWidth: availableWidth,
+                    availableHeight: geometry.size.height,
+                    gridMode: gridMode,
+                    spacing: spacing
+                )
+                let gridItems = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: columns)
                 VStack(alignment: .leading, spacing: 8) {
                     ScrollView {
                         VStack(spacing: 0) {
@@ -117,7 +95,7 @@ struct PhotoTabView: View {
                                         imageHeight: imageHeight,
                                         colorScheme: colorScheme,
                                         onTap: { _ in
-                                            if let url = URL(string: imageUrl) {
+                                            if let url = URL(string: imageUrl), preloader.loadedImages[url] != nil {
                                                 overlayUUID = UUID()
                                                 fullScreenImage = PresentedImage(url: url)
                                             }
@@ -128,14 +106,7 @@ struct PhotoTabView: View {
                             }
                             .frame(maxWidth: gridMode == .single ? (columns == 1 ? 430 : (imageWidth * 2 + spacing)) : .infinity)
                             .frame(maxWidth: .infinity)
-                            // Show only when pulling to refresh
-                            if isRefreshing {
-                                Text("Last refreshed: \(preloader.lastRefreshed, formatter: dateFormatter)")
-                                    .font(.caption2)
-                                    .foregroundColor(.gray)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 4)
-                            }
+                           
                         }
                         .background(
                             GeometryReader { scrollGeo in
@@ -180,76 +151,11 @@ struct PhotoTabView: View {
             // Overlay the fullscreen image if needed
             if let presented = fullScreenImage {
                 FullScreenImageView(url: presented.url, preloader: preloader) {
-                    withAnimation { fullScreenImage = nil }
+                    withAnimation { print("hi"); fullScreenImage = nil }
                 }
                 .id(overlayUUID)
                 .transition(.opacity)
                 .zIndex(1)
-            }
-            // Floating grid mode toggle/floating button always overlays content
-            if fullScreenImage == nil {
-                VStack {
-                    HStack {
-                        Spacer()
-                        if isToggleVisible {
-                            HStack(spacing: 8) {
-                                Button(action: { gridMode = .compact }) {
-                                    Image(systemName: "square.grid.2x2")
-                                        .font(.system(size: 18, weight: .medium))
-                                        .foregroundColor(gridMode == .compact ? .accentColor : .secondary)
-                                        .padding(6)
-                                        .background(
-                                            Circle()
-                                                .fill(gridMode == .compact ? Color.accentColor.opacity(0.15) : Color.clear)
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                                Button(action: { gridMode = .single }) {
-                                    Image(systemName: "rectangle.fill")
-                                        .font(.system(size: 18, weight: .medium))
-                                        .foregroundColor(gridMode == .single ? .accentColor : .secondary)
-                                        .padding(6)
-                                        .background(
-                                            Circle()
-                                                .fill(gridMode == .single ? Color.accentColor.opacity(0.15) : Color.clear)
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemBackground).opacity(0.7))
-                                    .shadow(radius: 2)
-                            )
-                            .padding([.top, .trailing], 8)
-                            .animation(toggleAnimation, value: isToggleVisible)
-                        } else if showFloatingButton {
-                            Button(action: {
-                                withAnimation(toggleAnimation) {
-                                    isToggleVisible = true
-                                    showFloatingButton = false
-                                }
-                            }) {
-                                Image(systemName: gridIcon)
-                                    .font(.system(size: 20, weight: .medium))
-                                    .foregroundColor(.accentColor)
-                                    .frame(width: floatingButtonSize, height: floatingButtonSize)
-                                    .background(
-                                        Circle()
-                                            .fill(Color(.systemBackground).opacity(0.85))
-                                            .shadow(radius: 2)
-                                    )
-                            }
-                            .padding([.top, .trailing], floatingButtonPadding)
-                            .transition(.opacity)
-                            .animation(toggleAnimation, value: showFloatingButton)
-                        }
-                    }
-                    Spacer()
-                }
-                .allowsHitTesting(true)
-                .zIndex(2)
             }
         }
         .animation(.easeInOut, value: fullScreenImage)
@@ -274,6 +180,9 @@ struct PhotoTabView: View {
         }
         .onChange(of: refreshImagesTrigger) { _ in
             preloader.refreshImages()
+        }
+        .onChange(of: fullScreenImage) { newValue in
+            isFullScreen = newValue != nil
         }
         .tabItem {
             Label(title, systemImage: icon)

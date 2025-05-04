@@ -95,9 +95,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E21BA5B02DC2C9F9008638D3 /*  lcc*/ = {
+		E21BA5B02DC2C9F9008638D3 /* lcc */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E21BA5D52DC2C9F9008638D3 /* Build configuration list for PBXNativeTarget " lcc" */;
+			buildConfigurationList = E21BA5D52DC2C9F9008638D3 /* Build configuration list for PBXNativeTarget "lcc" */;
 			buildPhases = (
 				E21BA5AD2DC2C9F9008638D3 /* Sources */,
 				E21BA5AE2DC2C9F9008638D3 /* Frameworks */,
@@ -108,7 +108,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				E21BA5B32DC2C9F9008638D3 /*  lcc */,
+				E21BA5B32DC2C9F9008638D3 /* lcc */,
 			);
 			name = lcc;
 			packageProductDependencies = (
@@ -200,7 +200,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				E21BA5B02DC2C9F9008638D3 /* lcc*/,
+				E21BA5B02DC2C9F9008638D3 /* lcc */,
 				E21BA5C02DC2C9F9008638D3 /* lccTests */,
 				E21BA5CA2DC2C9F9008638D3 /* lccUITests */,
 			);

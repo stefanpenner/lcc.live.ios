@@ -67,10 +67,37 @@ class ImagePreloader: ObservableObject {
         }
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
-            if let data = data, let image = UIImage(data: data), let httpResponse = response as? HTTPURLResponse {
-                let newEtag = httpResponse.allHeaderFields["Etag"] as? String
-                let newLastModified = httpResponse.allHeaderFields["Last-Modified"] as? String
-                
+            if let error = error {
+                print("[ImagePreloader] Failed to download image for URL: \(url) - Error: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.loading.remove(url)
+                }
+                return
+            }
+            guard let data = data, data.count > 100 else {
+                print("[ImagePreloader] Image data for URL \(url) is too small or missing.")
+                DispatchQueue.main.async {
+                    self.loading.remove(url)
+                }
+                return
+            }
+            guard let image = UIImage(data: data) else {
+                print("[ImagePreloader] Failed to decode image for URL: \(url). Data length: \(data.count)")
+                DispatchQueue.main.async {
+                    self.loading.remove(url)
+                }
+                return
+            }
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("[ImagePreloader] No HTTP response for URL: \(url)")
+                DispatchQueue.main.async {
+                    self.loading.remove(url)
+                }
+                return
+            }
+            let newEtag = httpResponse.allHeaderFields["Etag"] as? String
+            let newLastModified = httpResponse.allHeaderFields["Last-Modified"] as? String
+            DispatchQueue.main.async {
                 let prevEtag = self.etags[url]
                 let prevLastModified = self.lastModifieds[url]
                 let changed: Bool = {
@@ -91,27 +118,21 @@ class ImagePreloader: ObservableObject {
                     }
                     return changed
                 }()
-                DispatchQueue.main.async {
-                    let isFirstLoad = !self.hasLoadedOnce.contains(url)
-                    self.loadedImages[url] = image
-                    self.lastRefreshed = Date()
-                    self.hasLoadedOnce.insert(url)
-                    if changed && !isFirstLoad {
-                        self.loading.remove(url)
-                        self.fadingOut[url] = Date()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            self.fadingOut.removeValue(forKey: url)
-                        }
-                    } else if !isFirstLoad {
-                        self.loading.remove(url)
+                let isFirstLoad = !self.hasLoadedOnce.contains(url)
+                self.loadedImages[url] = image
+                self.lastRefreshed = Date()
+                self.hasLoadedOnce.insert(url)
+                if changed && !isFirstLoad {
+                    self.loading.remove(url)
+                    self.fadingOut[url] = Date()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.fadingOut.removeValue(forKey: url)
                     }
-                    if let newEtag = newEtag { self.etags[url] = newEtag }
-                    if let newLastModified = newLastModified { self.lastModifieds[url] = newLastModified }
-                }
-            } else {
-                DispatchQueue.main.async {
+                } else if !isFirstLoad {
                     self.loading.remove(url)
                 }
+                if let newEtag = newEtag { self.etags[url] = newEtag }
+                if let newLastModified = newLastModified { self.lastModifieds[url] = newLastModified }
             }
         }.resume()
     }
