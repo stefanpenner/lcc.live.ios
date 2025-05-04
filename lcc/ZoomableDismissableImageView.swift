@@ -76,4 +76,4 @@ struct ZoomableDismissableImageView: View {
                 isSnappingBack = false
             }
     }
-} 
+}

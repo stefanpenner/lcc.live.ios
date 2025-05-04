@@ -1,6 +1,6 @@
-import SwiftUI
 import Combine
 import Foundation
+import SwiftUI
 
 struct PhotoTabView: View {
     let images: [String]
@@ -85,7 +85,7 @@ private struct PhotoCell: View {
     let colorScheme: ColorScheme
     let onTap: (UIImage) -> Void
     @EnvironmentObject var preloader: ImagePreloader
-    
+
     var body: some View {
         let url = URL(string: imageUrl) ?? URL(fileURLWithPath: "")
         let isLoading = preloader.loading.contains(url)
@@ -124,7 +124,7 @@ private struct PhotoCell: View {
                                         endPoint: .bottomTrailing
                                     )
                                 )
-                        case .success(let image):
+                        case let .success(image):
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)

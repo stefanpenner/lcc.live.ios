@@ -5,13 +5,13 @@ struct ModernTabBar: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            ForEach(0..<4) { idx in
+            ForEach(0 ..< 4) { idx in
                 Button(action: {
                     selectedTab = idx
                 }) {
-                    Text("Tab \(idx + 1)")
-                        .font(selectedTab == idx ? .system(size: 17, weight: .bold) : .caption)
-                        .foregroundColor(selectedTab == idx ? .white : .secondary)
+                    Text(tabs[idx].title.uppercased())
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(selectedTab == idx ? .primary : .secondary)
                         .shadow(color: selectedTab == idx ? Color.black.opacity(0.35) : .clear, radius: 2, y: 1)
                         .textCase(.uppercase)
                         .kerning(selectedTab == idx ? 1.2 : 0.2)
@@ -31,4 +31,4 @@ struct ModernTabBar_Previews: PreviewProvider {
     static var previews: some View {
         ModernTabBar()
     }
-} 
+}

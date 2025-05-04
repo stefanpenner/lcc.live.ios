@@ -41,8 +41,8 @@ struct MainView: View {
     // Grid mode toggle state (now global)
     @State var gridMode: PhotoTabView.GridMode = .compact
     @State private var isToggleVisible: Bool = true
-    @State private var lastScrollDate: Date = Date()
-    @State private var showFloatingButton: Bool = false
+    @State private var lastScrollDate: Date = .init()
+
     private let toggleFadeDuration: Double = 0.25
     private let toggleHideDelay: Double = 1.0
     private let floatingButtonSize: CGFloat = 36
@@ -53,7 +53,7 @@ struct MainView: View {
     // Tab info for custom tab bar
     private let tabs: [(title: String, icon: String)] = [
         ("lcc", "mountain.2"),
-        ("bcc", "mountain.2")
+        ("bcc", "mountain.2"),
     ]
 
     @State private var fullScreenImage: PresentedImage? = nil
@@ -63,7 +63,7 @@ struct MainView: View {
     var lccPhotoTab: some View {
         PhotoTabView(
             images: lccImages,
-            title: "lcc",
+            title: "LCC",
             icon: "mountain.2",
             selectedTab: $selectedTab,
             tabIndex: 0,
@@ -82,7 +82,7 @@ struct MainView: View {
     var bccPhotoTab: some View {
         PhotoTabView(
             images: bccImages,
-            title: "bcc",
+            title: "BCC",
             icon: "mountain.2",
             selectedTab: $selectedTab,
             tabIndex: 1,
@@ -99,14 +99,39 @@ struct MainView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             TabView(selection: $selectedTab) {
                 lccPhotoTab
                 bccPhotoTab
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .allowsHitTesting(!isAnyFullScreen)
-            
+
+            // Top floating ModernTabBar
+            VStack {
+                ModernTabBar(
+                    tabs: tabs,
+                    selectedTab: $selectedTab,
+                )
+                Spacer()
+            }
+            .padding(.top, 8)
+            .zIndex(2)
+
+            // Bottom floating GridModeToggle
+            VStack {
+                Spacer()
+                GridModeToggle(
+                    gridMode: $gridMode,
+                    toggleAnimation: toggleAnimation,
+                    floatingButtonSize: floatingButtonSize,
+                    floatingButtonPadding: floatingButtonPadding,
+                    gridIcon: gridIcon,
+                )
+                .padding(.bottom, 8)
+            }
+            .zIndex(2)
+
             // Overlay the fullscreen image if needed
             if let presented = fullScreenImage {
                 FullScreenImageView(url: presented.url, preloader: preloader) {
@@ -114,25 +139,7 @@ struct MainView: View {
                 }
                 .id(overlayUUID)
                 .transition(.opacity)
-                .zIndex(1)
-            } else {
-                GridModeToggle(
-                    gridMode: $gridMode,
-                    isToggleVisible: $isToggleVisible,
-                    showFloatingButton: $showFloatingButton,
-                    toggleAnimation: toggleAnimation,
-                    floatingButtonSize: floatingButtonSize,
-                    floatingButtonPadding: floatingButtonPadding,
-                    gridIcon: gridIcon
-                )
-                .zIndex(2)
-                
-                ModernTabBar(
-                    tabs: tabs,
-                    selectedTab: $selectedTab,
-                    isAnyFullScreen: isAnyFullScreen
-                )
-                
+                .zIndex(3)
             }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -153,10 +160,11 @@ struct MainView: View {
 // Helper for blur background
 struct BlurView: UIViewRepresentable {
     var style: UIBlurEffect.Style
-    func makeUIView(context: Context) -> UIVisualEffectView {
+    func makeUIView(context _: Context) -> UIVisualEffectView {
         UIVisualEffectView(effect: UIBlurEffect(style: style))
     }
-    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
+
+    func updateUIView(_: UIVisualEffectView, context _: Context) {}
 }
 
 #Preview {

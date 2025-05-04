@@ -3,7 +3,7 @@ import UIKit
 
 class ImagePreloader: ObservableObject {
     @Published var loadedImages: [URL: UIImage] = [:]
-    @Published var lastRefreshed: Date = Date()
+    @Published var lastRefreshed: Date = .init()
     @Published var loading: Set<URL> = []
     @Published var fadingOut: [URL: Date] = [:]
     private var urls: [URL] = []

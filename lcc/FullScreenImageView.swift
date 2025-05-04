@@ -22,9 +22,9 @@ struct FullScreenImageView: View {
 
         GeometryReader { geometry in
             ZStack {
-                 Color.black
-                     .opacity(backgroundOpacity)
-                     .edgesIgnoringSafeArea(.all)
+                Color.black
+                    .opacity(backgroundOpacity)
+                    .edgesIgnoringSafeArea(.all)
 
                 Group {
                     if let image = preloader.loadedImages[url] {
@@ -49,7 +49,7 @@ struct FullScreenImageView: View {
                 onFlickDismiss?()
             }
         }
-        
+
         EscapeKeyHandler {
             onFlickDismiss?()
         }
@@ -74,7 +74,8 @@ private struct EscapeKeyHandler: UIViewRepresentable {
         view.addSubview(context.coordinator.dummy)
         return view
     }
-    func updateUIView(_ uiView: UIView, context: Context) {}
+
+    func updateUIView(_: UIView, context _: Context) {}
     func makeCoordinator() -> Coordinator { Coordinator() }
     class Coordinator: NSObject {
         var onEscape: (() -> Void)?
@@ -83,6 +84,7 @@ private struct EscapeKeyHandler: UIViewRepresentable {
             super.init()
             dummy.coordinator = self
         }
+
         class DummyResponder: UIView {
             weak var coordinator: Coordinator?
             override var canBecomeFirstResponder: Bool { true }
@@ -90,9 +92,11 @@ private struct EscapeKeyHandler: UIViewRepresentable {
                 super.didMoveToWindow()
                 becomeFirstResponder()
             }
+
             override var keyCommands: [UIKeyCommand]? {
                 [UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(handleEscape))]
             }
+
             @objc func handleEscape() {
                 coordinator?.onEscape?()
             }

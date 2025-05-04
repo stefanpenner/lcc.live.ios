@@ -29,4 +29,4 @@ func calculateGridLayout(
             return (columns, imageWidth, imageHeight)
         }
     }
-} 
+}
