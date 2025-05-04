@@ -13,6 +13,7 @@ struct PhotoTabView: View {
     @Binding public var gridMode: GridMode
     var onRequestFullScreen: (PresentedImage) -> Void
     var preloader: ImagePreloader
+    let topContentInset: CGFloat
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -52,6 +53,7 @@ struct PhotoTabView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
+            .padding(.top, topContentInset)
         }
         .gesture(
             DragGesture(minimumDistance: 20, coordinateSpace: .local)

@@ -42,6 +42,8 @@ struct MainView: View {
     @State var gridMode: PhotoTabView.GridMode = .compact
     @State private var isToggleVisible: Bool = true
     @State private var lastScrollDate: Date = .init()
+    @Environment(\.safeAreaInsets) private var safeAreaInsets
+    let tabBarHeight: CGFloat = 36
 
     private let toggleFadeDuration: Double = 0.25
     private let toggleHideDelay: Double = 1.0
@@ -63,7 +65,7 @@ struct MainView: View {
     var lccPhotoTab: some View {
         PhotoTabView(
             images: lccImages,
-            title: "LCC",
+            title: "lcc",
             icon: "mountain.2",
             selectedTab: $selectedTab,
             tabIndex: 0,
@@ -74,7 +76,8 @@ struct MainView: View {
                 overlayUUID = UUID()
                 fullScreenImage = image
             },
-            preloader: preloader
+            preloader: preloader,
+            topContentInset: safeAreaInsets.top + tabBarHeight
         )
         .tag(0)
     }
@@ -82,7 +85,7 @@ struct MainView: View {
     var bccPhotoTab: some View {
         PhotoTabView(
             images: bccImages,
-            title: "BCC",
+            title: "bcc",
             icon: "mountain.2",
             selectedTab: $selectedTab,
             tabIndex: 1,
@@ -93,7 +96,8 @@ struct MainView: View {
                 overlayUUID = UUID()
                 fullScreenImage = image
             },
-            preloader: preloader
+            preloader: preloader,
+            topContentInset: safeAreaInsets.top + tabBarHeight
         )
         .tag(1)
     }
@@ -107,15 +111,33 @@ struct MainView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
             .allowsHitTesting(!isAnyFullScreen)
 
+            // Top gradient overlay (at the very top, Photos app style)
+            VStack(spacing: 0) {
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(.systemBackground).opacity(0.95),
+                        Color(.systemBackground).opacity(0.7),
+                        Color(.systemBackground).opacity(0.0)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 80)
+                Spacer()
+            }
+            .ignoresSafeArea(edges: .top)
+            .zIndex(1.5)
+
             // Top floating ModernTabBar
             VStack {
                 ModernTabBar(
                     tabs: tabs,
-                    selectedTab: $selectedTab,
+                    selectedTab: $selectedTab
                 )
+                .frame(height: tabBarHeight)
+                .padding(.top, safeAreaInsets.top + 4)
                 Spacer()
             }
-            .padding(.top, 8)
             .zIndex(2)
 
             // Bottom floating GridModeToggle
@@ -126,7 +148,7 @@ struct MainView: View {
                     toggleAnimation: toggleAnimation,
                     floatingButtonSize: floatingButtonSize,
                     floatingButtonPadding: floatingButtonPadding,
-                    gridIcon: gridIcon,
+                    gridIcon: gridIcon
                 )
                 .padding(.bottom, 8)
             }
@@ -142,6 +164,7 @@ struct MainView: View {
                 .zIndex(3)
             }
         }
+        .ignoresSafeArea(edges: .top)
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .onChange(of: selectedTab) { _ in
             refreshImagesTrigger += 1
