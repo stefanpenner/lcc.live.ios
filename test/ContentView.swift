@@ -36,8 +36,8 @@ struct ContentView: View {
     
     var body: some View {
         TabView {
-            PhotoTabView(images: lccImages, title: "lcc", icon: "leaf")
-            PhotoTabView(images: bccImages, title: "bcc", icon: "flame")
+            PhotoTabView(images: lccImages, title: "lcc", icon: "mountain.2")
+            PhotoTabView(images: bccImages, title: "bcc", icon: "mountain.2")
         }
         .tabViewStyle(.automatic)
     }
