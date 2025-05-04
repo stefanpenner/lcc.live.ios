@@ -23,23 +23,37 @@ struct ContentView: View {
         "https://lcc.live/image/aHR0cHM6Ly9iYWNrZW5kLnJvdW5kc2hvdC5jb20vY2Ftcy80OGZjMjIzYzBlZDg4NDc0ZWNjMmY4ODRiZjM5ZGU2My9tZWRpdW0=",
         "https://lcc.live/image/aHR0cHM6Ly9iYWNrZW5kLnJvdW5kc2hvdC5jb20vY2Ftcy80NGNmZmY0ZmYyYTIxOGExMTc4ZGJiMTA1ZDk1ODQ2YS9tZWRpdW0=",
         "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzU3ODA3NTRmLThkYTEtNDIyMy1hYjhhLTY3NTVkODRjYmMxMC9zbmFwc2hvdA==",
-        "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzYxYjI0OTBiZTEwMWMwMGI5YzQ4Mzc0Zi9zbmFwc2hvdA=="
+        "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzYxYjI0OTBiZTEwMWMwMGI5YzQ4Mzc0Zi9zbmFwc2hvdA==",
     ]
-    
+
     let bccImages = [
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTQ2MDUuanBlZw==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTIuanBlZw==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTMuanBlZw==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTUuanBlZw==",
-        "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTYuanBlZw=="
+        "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTYuanBlZw==",
     ]
-    
+
+    @State private var selectedTab = 0
+    @State private var refreshImagesTrigger = 0
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
-        TabView {
-            PhotoTabView(images: lccImages, title: "lcc", icon: "mountain.2")
-            PhotoTabView(images: bccImages, title: "bcc", icon: "mountain.2")
+        TabView(selection: $selectedTab) {
+            PhotoTabView(images: lccImages, title: "lcc", icon: "mountain.2", refreshImagesTrigger: refreshImagesTrigger)
+                .tag(0)
+            PhotoTabView(images: bccImages, title: "bcc", icon: "mountain.2", refreshImagesTrigger: refreshImagesTrigger)
+                .tag(1)
         }
         .tabViewStyle(.automatic)
+        .onChange(of: selectedTab) { _ in
+            refreshImagesTrigger += 1
+        }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                refreshImagesTrigger += 1
+            }
+        }
     }
 }
 
