@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E21BA5B02DC2C9F9008638D3"
-               BuildableName = "test.app"
-               BlueprintName = "test"
-               ReferencedContainer = "container:test.xcodeproj">
+               BuildableName = "lcc.app"
+               BlueprintName = "lcc"
+               ReferencedContainer = "container:lcc.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -36,9 +36,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E21BA5C02DC2C9F9008638D3"
-               BuildableName = "testTests.xctest"
-               BlueprintName = "testTests"
-               ReferencedContainer = "container:test.xcodeproj">
+               BuildableName = "lccTests.xclcc"
+               BlueprintName = "lccTests"
+               ReferencedContainer = "container:lcc.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -47,9 +47,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E21BA5CA2DC2C9F9008638D3"
-               BuildableName = "testUITests.xctest"
-               BlueprintName = "testUITests"
-               ReferencedContainer = "container:test.xcodeproj">
+               BuildableName = "lccUITests.xclcc"
+               BlueprintName = "lccUITests"
+               ReferencedContainer = "container:lcc.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -69,9 +69,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "E21BA5B02DC2C9F9008638D3"
-            BuildableName = "test.app"
-            BlueprintName = "test"
-            ReferencedContainer = "container:test.xcodeproj">
+            BuildableName = "lcc.app"
+            BlueprintName = "lcc"
+            ReferencedContainer = "container:lcc.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -86,9 +86,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "E21BA5B02DC2C9F9008638D3"
-            BuildableName = "test.app"
-            BlueprintName = "test"
-            ReferencedContainer = "container:test.xcodeproj">
+            BuildableName = "lcc.app"
+            BlueprintName = "lcc"
+            ReferencedContainer = "container:lcc.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
