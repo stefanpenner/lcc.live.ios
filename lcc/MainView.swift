@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ContentView: View {
+struct MainView: View {
     // TODO: hard-coded for now until we have an API
     let lccImages = [
         "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzg2MTFlMjc2LTdlZTUtNDJjMC1iOGNkLWQ5ZTE4OTBlMWNkNC9zbmFwc2hvdA==",
@@ -71,7 +71,6 @@ struct ContentView: View {
                     selectedTab: $selectedTab,
                     tabIndex: 0,
                     tabCount: 2,
-                    isFullScreen: $isAnyFullScreen,
                     gridMode: $gridMode,
                     isToggleVisible: $isToggleVisible,
                     lastScrollDate: $lastScrollDate,
@@ -93,7 +92,6 @@ struct ContentView: View {
                     selectedTab: $selectedTab,
                     tabIndex: 1,
                     tabCount: 2,
-                    isFullScreen: $isAnyFullScreen,
                     gridMode: $gridMode,
                     isToggleVisible: $isToggleVisible,
                     lastScrollDate: $lastScrollDate,
@@ -110,13 +108,16 @@ struct ContentView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .allowsHitTesting(!isAnyFullScreen)
-            ModernTabBar(
-                tabs: tabs,
-                selectedTab: $selectedTab,
-                isAnyFullScreen: isAnyFullScreen
-            )
-            // Floating grid mode toggle/floating button always overlays content
-            if !isAnyFullScreen {
+            
+            // Overlay the fullscreen image if needed
+            if let presented = fullScreenImage {
+                FullScreenImageView(url: presented.url, preloader: preloader) {
+                    withAnimation { fullScreenImage = nil }
+                }
+                .id(overlayUUID)
+                .transition(.opacity)
+                .zIndex(1)
+            } else {
                 GridModeToggle(
                     gridMode: $gridMode,
                     isToggleVisible: $isToggleVisible,
@@ -127,16 +128,13 @@ struct ContentView: View {
                     gridIcon: gridIcon
                 )
                 .zIndex(2)
-            }
-
-              // Overlay the fullscreen image if needed
-            if let presented = fullScreenImage {
-                FullScreenImageView(url: presented.url, preloader: preloader) {
-                    withAnimation { fullScreenImage = nil }
-                }
-                .id(overlayUUID)
-                .transition(.opacity)
-                .zIndex(1)
+                
+                ModernTabBar(
+                    tabs: tabs,
+                    selectedTab: $selectedTab,
+                    isAnyFullScreen: isAnyFullScreen
+                )
+                
             }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -164,5 +162,5 @@ struct BlurView: UIViewRepresentable {
 }
 
 #Preview {
-    ContentView()
+    MainView()
 }
