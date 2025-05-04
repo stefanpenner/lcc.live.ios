@@ -60,51 +60,49 @@ struct MainView: View {
     @State private var overlayUUID = UUID()
     @StateObject private var preloader = ImagePreloader()
 
+    var lccPhotoTab: some View {
+        PhotoTabView(
+            images: lccImages,
+            title: "lcc",
+            icon: "mountain.2",
+            selectedTab: $selectedTab,
+            tabIndex: 0,
+            tabCount: 2,
+            isFullScreen: $isAnyFullScreen,
+            gridMode: $gridMode,
+            onRequestFullScreen: { image in
+                overlayUUID = UUID()
+                fullScreenImage = image
+            },
+            preloader: preloader
+        )
+        .tag(0)
+    }
+
+    var bccPhotoTab: some View {
+        PhotoTabView(
+            images: bccImages,
+            title: "bcc",
+            icon: "mountain.2",
+            selectedTab: $selectedTab,
+            tabIndex: 1,
+            tabCount: 2,
+            isFullScreen: $isAnyFullScreen,
+            gridMode: $gridMode,
+            onRequestFullScreen: { image in
+                overlayUUID = UUID()
+                fullScreenImage = image
+            },
+            preloader: preloader
+        )
+        .tag(1)
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $selectedTab) {
-                PhotoTabView(
-                    images: lccImages,
-                    title: "lcc",
-                    icon: "mountain.2",
-                    refreshImagesTrigger: refreshImagesTrigger,
-                    selectedTab: $selectedTab,
-                    tabIndex: 0,
-                    tabCount: 2,
-                    gridMode: $gridMode,
-                    isToggleVisible: $isToggleVisible,
-                    lastScrollDate: $lastScrollDate,
-                    showFloatingButton: $showFloatingButton,
-                    toggleAnimation: toggleAnimation,
-                    toggleHideDelay: toggleHideDelay,
-                    onRequestFullScreen: { image in
-                        overlayUUID = UUID()
-                        fullScreenImage = image
-                    },
-                    preloader: preloader
-                )
-                .tag(0)
-                PhotoTabView(
-                    images: bccImages,
-                    title: "bcc",
-                    icon: "mountain.2",
-                    refreshImagesTrigger: refreshImagesTrigger,
-                    selectedTab: $selectedTab,
-                    tabIndex: 1,
-                    tabCount: 2,
-                    gridMode: $gridMode,
-                    isToggleVisible: $isToggleVisible,
-                    lastScrollDate: $lastScrollDate,
-                    showFloatingButton: $showFloatingButton,
-                    toggleAnimation: toggleAnimation,
-                    toggleHideDelay: toggleHideDelay,
-                    onRequestFullScreen: { image in
-                        overlayUUID = UUID()
-                        fullScreenImage = image
-                    },
-                    preloader: preloader
-                )
-                .tag(1)
+                lccPhotoTab
+                bccPhotoTab
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .allowsHitTesting(!isAnyFullScreen)
