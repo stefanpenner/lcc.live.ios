@@ -56,6 +56,10 @@ struct ContentView: View {
         ("bcc", "mountain.2")
     ]
 
+    @State private var fullScreenImage: PresentedImage? = nil
+    @State private var overlayUUID = UUID()
+    @StateObject private var preloader = ImagePreloader()
+
     var body: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $selectedTab) {
@@ -73,7 +77,12 @@ struct ContentView: View {
                     lastScrollDate: $lastScrollDate,
                     showFloatingButton: $showFloatingButton,
                     toggleAnimation: toggleAnimation,
-                    toggleHideDelay: toggleHideDelay
+                    toggleHideDelay: toggleHideDelay,
+                    onRequestFullScreen: { image in
+                        overlayUUID = UUID()
+                        fullScreenImage = image
+                    },
+                    preloader: preloader
                 )
                 .tag(0)
                 PhotoTabView(
@@ -90,7 +99,12 @@ struct ContentView: View {
                     lastScrollDate: $lastScrollDate,
                     showFloatingButton: $showFloatingButton,
                     toggleAnimation: toggleAnimation,
-                    toggleHideDelay: toggleHideDelay
+                    toggleHideDelay: toggleHideDelay,
+                    onRequestFullScreen: { image in
+                        overlayUUID = UUID()
+                        fullScreenImage = image
+                    },
+                    preloader: preloader
                 )
                 .tag(1)
             }
@@ -114,6 +128,16 @@ struct ContentView: View {
                 )
                 .zIndex(2)
             }
+
+              // Overlay the fullscreen image if needed
+            if let presented = fullScreenImage {
+                FullScreenImageView(url: presented.url, preloader: preloader) {
+                    withAnimation { fullScreenImage = nil }
+                }
+                .id(overlayUUID)
+                .transition(.opacity)
+                .zIndex(1)
+            }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .onChange(of: selectedTab) { _ in
@@ -121,8 +145,11 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
-                    refreshImagesTrigger += 1
-                }
+                refreshImagesTrigger += 1
+            }
+        }
+        .onChange(of: fullScreenImage) { newValue in
+            isAnyFullScreen = newValue != nil
         }
     }
 }

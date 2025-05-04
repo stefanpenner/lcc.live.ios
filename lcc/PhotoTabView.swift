@@ -11,18 +11,20 @@ struct PhotoTabView: View {
     let tabIndex: Int
     let tabCount: Int
     @Binding var isFullScreen: Bool
+    @Binding public var gridMode: GridMode
+    @Binding var isToggleVisible: Bool
+    @Binding var lastScrollDate: Date
+    @Binding var showFloatingButton: Bool
+    var toggleAnimation: Animation
+    var toggleHideDelay: Double
+    var onRequestFullScreen: (PresentedImage) -> Void
+    var preloader: ImagePreloader
 
-    @StateObject private var preloader = ImagePreloader()
     @Environment(\.colorScheme) var colorScheme
 
     // Layout constants
     private let minImageWidth: CGFloat = 340
     private let spacing: CGFloat = 20
-
-    // Use optional PresentedImage for full screen state
-    @State private var fullScreenImage: PresentedImage? = nil
-    @State private var overlayUUID = UUID()
-    @State private var isRefreshing = false
 
     // User grid mode
     public enum GridMode: String, CaseIterable, Identifiable {
@@ -30,7 +32,6 @@ struct PhotoTabView: View {
         case single = "Single"
         var id: String { rawValue }
     }
-    @Binding public var gridMode: GridMode
 
     // Add enum for image size
     private enum ImageSizeCategory {
@@ -57,12 +58,6 @@ struct PhotoTabView: View {
             }
         }
     }
-
-    @Binding var isToggleVisible: Bool
-    @Binding var lastScrollDate: Date
-    @Binding var showFloatingButton: Bool
-    var toggleAnimation: Animation
-    var toggleHideDelay: Double
 
     // Scroll offset preference key
     private struct ScrollOffsetPreferenceKey: PreferenceKey {
@@ -96,8 +91,7 @@ struct PhotoTabView: View {
                                         colorScheme: colorScheme,
                                         onTap: { _ in
                                             if let url = URL(string: imageUrl), preloader.loadedImages[url] != nil {
-                                                overlayUUID = UUID()
-                                                fullScreenImage = PresentedImage(url: url)
+                                                onRequestFullScreen(PresentedImage(url: url))
                                             }
                                         }
                                     )
@@ -106,7 +100,6 @@ struct PhotoTabView: View {
                             }
                             .frame(maxWidth: gridMode == .single ? (columns == 1 ? 430 : (imageWidth * 2 + spacing)) : .infinity)
                             .frame(maxWidth: .infinity)
-                           
                         }
                         .background(
                             GeometryReader { scrollGeo in
@@ -148,17 +141,7 @@ struct PhotoTabView: View {
                     }
                 }
             }
-            // Overlay the fullscreen image if needed
-            if let presented = fullScreenImage {
-                FullScreenImageView(url: presented.url, preloader: preloader) {
-                    withAnimation { print("hi"); fullScreenImage = nil }
-                }
-                .id(overlayUUID)
-                .transition(.opacity)
-                .zIndex(1)
-            }
         }
-        .animation(.easeInOut, value: fullScreenImage)
         .gesture(
             DragGesture(minimumDistance: 20, coordinateSpace: .local)
                 .onEnded { value in
@@ -180,9 +163,6 @@ struct PhotoTabView: View {
         }
         .onChange(of: refreshImagesTrigger) { _ in
             preloader.refreshImages()
-        }
-        .onChange(of: fullScreenImage) { newValue in
-            isFullScreen = newValue != nil
         }
         .tabItem {
             Label(title, systemImage: icon)
