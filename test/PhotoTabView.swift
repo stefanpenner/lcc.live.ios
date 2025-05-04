@@ -12,43 +12,54 @@ struct PhotoTabView: View {
     private let minImageWidth: CGFloat = 340
     private let spacing: CGFloat = 20
     
-    // Use optional UIImage for full screen state
-    @State private var fullScreenImage: UIImage? = nil
+    // Use optional PresentedImage for full screen state
+    @State private var fullScreenImage: PresentedImage? = nil
+    @State private var overlayUUID = UUID()
     
     var body: some View {
-        GeometryReader { geometry in
-            let availableWidth = geometry.size.width - (spacing * 2)
-            let maxColumns = max(1, Int(availableWidth / minImageWidth))
-            let imageWidth = max(minImageWidth, (availableWidth - (spacing * CGFloat(maxColumns - 1))) / CGFloat(maxColumns))
-            let imageHeight = imageWidth * 0.6
-            let columns = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: maxColumns)
-            
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: spacing) {
-                    ForEach(images, id: \.self) { imageUrl in
-                        PhotoCell(
-                            imageUrl: imageUrl,
-                            preloadedImage: preloader.loadedImages[URL(string: imageUrl) ?? URL(fileURLWithPath: "")],
-                            imageWidth: imageWidth,
-                            imageHeight: imageHeight,
-                            colorScheme: colorScheme,
-                            onTap: { image in
-                                fullScreenImage = image
-                            }
-                        )
+        ZStack {
+            GeometryReader { geometry in
+                let availableWidth = geometry.size.width - (spacing * 2)
+                let maxColumns = max(1, Int(availableWidth / minImageWidth))
+                let imageWidth = max(minImageWidth, (availableWidth - (spacing * CGFloat(maxColumns - 1))) / CGFloat(maxColumns))
+                let imageHeight = imageWidth * 0.6
+                let columns = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: maxColumns)
+                
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: spacing) {
+                        ForEach(images, id: \.self) { imageUrl in
+                            PhotoCell(
+                                imageUrl: imageUrl,
+                                preloadedImage: preloader.loadedImages[URL(string: imageUrl) ?? URL(fileURLWithPath: "")],
+                                imageWidth: imageWidth,
+                                imageHeight: imageHeight,
+                                colorScheme: colorScheme,
+                                onTap: { image in
+                                    overlayUUID = UUID()
+                                    fullScreenImage = PresentedImage(image: image)
+                                }
+                            )
+                        }
                     }
+                    .padding()
                 }
-                .padding()
+            }
+            // Overlay the fullscreen image if needed
+            if let presented = fullScreenImage {
+                FullScreenImageView(image: presented.image) {
+                    withAnimation { fullScreenImage = nil }
+                }
+                .id(overlayUUID)
+                .transition(.opacity)
+                .zIndex(1)
             }
         }
+        .animation(.easeInOut, value: fullScreenImage)
         .onAppear {
             preloader.preloadImages(from: images)
         }
         .tabItem {
             Label(title, systemImage: icon)
-        }
-        .fullScreenCover(item: $fullScreenImage) { image in
-            FullScreenImageView(image: image)
         }
     }
 }
