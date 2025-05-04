@@ -3,10 +3,15 @@ import UIKit
 
 class ImagePreloader: ObservableObject {
     @Published var loadedImages: [URL: UIImage] = [:]
-    @Published var lastRefreshed: Date = .init()
+    @Published var lastRefreshed: Date = Date()
+    @Published var loading: Set<URL> = []
+    @Published var fadingOut: [URL: Date] = [:]
     private var urls: [URL] = []
     private var timer: Timer?
     private let refreshInterval: TimeInterval = 5.0
+    private var etags: [URL: String] = [:]
+    private var lastModifieds: [URL: String] = [:]
+    private var hasLoadedOnce: Set<URL> = []
 
     init() {
         startBackgroundRefresh()
@@ -55,12 +60,57 @@ class ImagePreloader: ObservableObject {
     private func loadImage(for url: URL, forceRefresh: Bool = false) {
         var request = URLRequest(url: url)
         request.cachePolicy = forceRefresh ? .reloadIgnoringLocalCacheData : .useProtocolCachePolicy
-        URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+        DispatchQueue.main.async {
+            if self.hasLoadedOnce.contains(url) {
+                self.loading.insert(url)
+            }
+        }
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
-            if let data = data, let image = UIImage(data: data) {
+            if let data = data, let image = UIImage(data: data), let httpResponse = response as? HTTPURLResponse {
+                let newEtag = httpResponse.allHeaderFields["Etag"] as? String
+                let newLastModified = httpResponse.allHeaderFields["Last-Modified"] as? String
+                
+                let prevEtag = self.etags[url]
+                let prevLastModified = self.lastModifieds[url]
+                let changed: Bool = {
+                    var changed = false
+                    if let newEtag = newEtag {
+                        if let prevEtag = prevEtag {
+                            changed = newEtag != prevEtag
+                        } else {
+                            changed = true
+                        }
+                    }
+                    if let newLastModified = newLastModified {
+                        if let prevLastModified = prevLastModified {
+                            changed = changed || (newLastModified != prevLastModified)
+                        } else {
+                            changed = true
+                        }
+                    }
+                    return changed
+                }()
                 DispatchQueue.main.async {
+                    let isFirstLoad = !self.hasLoadedOnce.contains(url)
                     self.loadedImages[url] = image
                     self.lastRefreshed = Date()
+                    self.hasLoadedOnce.insert(url)
+                    if changed && !isFirstLoad {
+                        self.loading.remove(url)
+                        self.fadingOut[url] = Date()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.fadingOut.removeValue(forKey: url)
+                        }
+                    } else if !isFirstLoad {
+                        self.loading.remove(url)
+                    }
+                    if let newEtag = newEtag { self.etags[url] = newEtag }
+                    if let newLastModified = newLastModified { self.lastModifieds[url] = newLastModified }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.loading.remove(url)
                 }
             }
         }.resume()

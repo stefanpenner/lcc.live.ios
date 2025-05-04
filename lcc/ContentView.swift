@@ -40,10 +40,26 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            PhotoTabView(images: lccImages, title: "lcc", icon: "mountain.2", refreshImagesTrigger: refreshImagesTrigger)
-                .tag(0)
-            PhotoTabView(images: bccImages, title: "bcc", icon: "mountain.2", refreshImagesTrigger: refreshImagesTrigger)
-                .tag(1)
+            PhotoTabView(
+                images: lccImages,
+                title: "lcc",
+                icon: "mountain.2",
+                refreshImagesTrigger: refreshImagesTrigger,
+                selectedTab: $selectedTab,
+                tabIndex: 0,
+                tabCount: 2
+            )
+            .tag(0)
+            PhotoTabView(
+                images: bccImages,
+                title: "bcc",
+                icon: "mountain.2",
+                refreshImagesTrigger: refreshImagesTrigger,
+                selectedTab: $selectedTab,
+                tabIndex: 1,
+                tabCount: 2
+            )
+            .tag(1)
         }
         .tabViewStyle(.automatic)
         .onChange(of: selectedTab) { _ in

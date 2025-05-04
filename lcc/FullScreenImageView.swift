@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct FullScreenImageView: View {
     let url: URL
@@ -91,20 +92,10 @@ struct FullScreenImageView: View {
                 }
             }
         }
-        .overlay(
-            Button(action: {
-                onFlickDismiss?()
-            }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 30))
-                    .foregroundColor(.white)
-                    .background(Circle().fill(Color.black.opacity(0.5)))
-                    .padding()
-            }
-            .padding()
-            .opacity(isDismissing ? 0 : 1),
-            alignment: .topTrailing
-        )
+        EscapeKeyHandler {
+            onFlickDismiss?()
+        }
+        .frame(width: 0, height: 0)
         .statusBar(hidden: true)
         .onChange(of: preloader.loadedImages[url]) { _ in
             offset = .zero
@@ -112,6 +103,41 @@ struct FullScreenImageView: View {
             isDismissing = false
             isDragging = false
             isSnappingBack = false
+        }
+    }
+}
+
+private struct EscapeKeyHandler: UIViewRepresentable {
+    var onEscape: () -> Void
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        context.coordinator.onEscape = onEscape
+        view.addSubview(context.coordinator.dummy)
+        return view
+    }
+    func updateUIView(_ uiView: UIView, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    class Coordinator: NSObject {
+        var onEscape: (() -> Void)?
+        let dummy = DummyResponder()
+        override init() {
+            super.init()
+            dummy.coordinator = self
+        }
+        class DummyResponder: UIView {
+            weak var coordinator: Coordinator?
+            override var canBecomeFirstResponder: Bool { true }
+            override func didMoveToWindow() {
+                super.didMoveToWindow()
+                becomeFirstResponder()
+            }
+            override var keyCommands: [UIKeyCommand]? {
+                [UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(handleEscape))]
+            }
+            @objc func handleEscape() {
+                coordinator?.onEscape?()
+            }
         }
     }
 }
