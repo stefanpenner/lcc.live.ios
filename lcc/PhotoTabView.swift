@@ -13,7 +13,6 @@ struct PhotoTabView: View {
     @Binding public var gridMode: GridMode
     var onRequestFullScreen: (PresentedImage) -> Void
     var preloader: ImagePreloader
-    let topContentInset: CGFloat
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -34,26 +33,29 @@ struct PhotoTabView: View {
             let imageHeight = imageWidth * (gridMode == .single ? 0.7 : 0.8)
             let gridItems = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: columns)
             ScrollView {
-                LazyVGrid(columns: gridItems, spacing: spacing) {
-                    ForEach(images, id: \.self) { imageUrl in
-                        PhotoCell(
-                            imageUrl: imageUrl,
-                            preloadedImage: preloader.loadedImages[URL(string: imageUrl) ?? URL(fileURLWithPath: "")],
-                            imageWidth: imageWidth,
-                            imageHeight: imageHeight,
-                            colorScheme: colorScheme,
-                            onTap: { _ in
-                                if let url = URL(string: imageUrl), preloader.loadedImages[url] != nil {
-                                    onRequestFullScreen(PresentedImage(url: url))
+                VStack(spacing: 0) {
+                    Color.clear
+                        .frame(height: 50) // 46 for tab bar + 4pt extra
+                    LazyVGrid(columns: gridItems, spacing: spacing) {
+                        ForEach(images, id: \.self) { imageUrl in
+                            PhotoCell(
+                                imageUrl: imageUrl,
+                                preloadedImage: preloader.loadedImages[URL(string: imageUrl) ?? URL(fileURLWithPath: "")],
+                                imageWidth: imageWidth,
+                                imageHeight: imageHeight,
+                                colorScheme: colorScheme,
+                                onTap: { _ in
+                                    if let url = URL(string: imageUrl), preloader.loadedImages[url] != nil {
+                                        onRequestFullScreen(PresentedImage(url: url))
+                                    }
                                 }
-                            }
-                        )
-                        .environmentObject(preloader)
+                            )
+                            .environmentObject(preloader)
+                        }
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
             }
-            .padding(.top, topContentInset)
         }
         .gesture(
             DragGesture(minimumDistance: 20, coordinateSpace: .local)

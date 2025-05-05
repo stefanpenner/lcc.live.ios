@@ -39,10 +39,9 @@ struct MainView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var isAnyFullScreen: Bool = false
     // Grid mode toggle state (now global)
-    @State var gridMode: PhotoTabView.GridMode = .compact
+    @State var gridMode: PhotoTabView.GridMode = .single
     @State private var isToggleVisible: Bool = true
     @State private var lastScrollDate: Date = .init()
-    @Environment(\.safeAreaInsets) private var safeAreaInsets
     let tabBarHeight: CGFloat = 36
 
     private let toggleFadeDuration: Double = 0.25
@@ -76,8 +75,7 @@ struct MainView: View {
                 overlayUUID = UUID()
                 fullScreenImage = image
             },
-            preloader: preloader,
-            topContentInset: safeAreaInsets.top + tabBarHeight
+            preloader: preloader
         )
         .tag(0)
     }
@@ -96,8 +94,7 @@ struct MainView: View {
                 overlayUUID = UUID()
                 fullScreenImage = image
             },
-            preloader: preloader,
-            topContentInset: safeAreaInsets.top + tabBarHeight
+            preloader: preloader
         )
         .tag(1)
     }
@@ -110,6 +107,7 @@ struct MainView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .allowsHitTesting(!isAnyFullScreen)
+            .ignoresSafeArea(edges: .top)
 
             // Top gradient overlay (at the very top, Photos app style)
             VStack(spacing: 0) {
@@ -128,31 +126,6 @@ struct MainView: View {
             .ignoresSafeArea(edges: .top)
             .zIndex(1.5)
 
-            // Top floating ModernTabBar
-            VStack {
-                ModernTabBar(
-                    tabs: tabs,
-                    selectedTab: $selectedTab
-                )
-                .frame(height: tabBarHeight)
-                .padding(.top, safeAreaInsets.top + 4)
-                Spacer()
-            }
-            .zIndex(2)
-
-            // Bottom floating GridModeToggle
-            VStack {
-                Spacer()
-                GridModeToggle(
-                    gridMode: $gridMode,
-                    toggleAnimation: toggleAnimation,
-                    floatingButtonSize: floatingButtonSize,
-                    floatingButtonPadding: floatingButtonPadding,
-                    gridIcon: gridIcon
-                )
-                .padding(.bottom, 8)
-            }
-            .zIndex(2)
 
             // Overlay the fullscreen image if needed
             if let presented = fullScreenImage {
@@ -162,9 +135,33 @@ struct MainView: View {
                 .id(overlayUUID)
                 .transition(.opacity)
                 .zIndex(3)
+            } else {
+                // Bottom floating GridModeToggle
+                VStack {
+                    Spacer()
+                    GridModeToggle(
+                        gridMode: $gridMode,
+                        toggleAnimation: toggleAnimation,
+                        floatingButtonSize: floatingButtonSize,
+                        floatingButtonPadding: floatingButtonPadding,
+                        gridIcon: gridIcon
+                    )
+                    .padding(.bottom, 8)
+                }
+                .zIndex(2)
             }
         }
-        .ignoresSafeArea(edges: .top)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if fullScreenImage == nil {
+                ModernTabBar(
+                    tabs: tabs,
+                    selectedTab: $selectedTab
+                )
+                .frame(height: tabBarHeight)
+                .padding(.top, 4)
+                .zIndex(2)
+            }
+        }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .onChange(of: selectedTab) { _ in
             refreshImagesTrigger += 1
