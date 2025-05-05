@@ -1,0 +1,27 @@
+- [ ] tab menu & grid control
+  - [ ] live icon (red) that helps people understand they are getting live
+    updates, and when they are disconnected. Clicking it should provided "last
+    uupdated" details
+  - [ ] a little more space for notch/dynamic island
+  - [ ] show when at top
+  - [ ] show when gliding up
+  - [ ] hide when active scrolling
+  - [ ] refactor to: <mountain icon> [LCC] [BCC]
+  - [ ] incorporate into dynamic island?
+  - [ ] animate pill move as slide
+
+- [ ] image grid
+  - [ ] more realestate
+  - [ ] name / description
+  - [ ] videos
+
+- [ ] fullscreen
+  - [ ] left/right = next/prev image
+
+- [ ] API
+  - [ ] Dynamically get canyons / images
+Random Ideas:
+- [ ] map view
+- [ ] weather details
+  - [ ] temp gradient
+  - [ ] snow levels
