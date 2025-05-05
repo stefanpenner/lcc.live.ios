@@ -115,7 +115,7 @@ struct MainView: View {
                     gradient: Gradient(colors: [
                         Color(.systemBackground).opacity(0.95),
                         Color(.systemBackground).opacity(0.7),
-                        Color(.systemBackground).opacity(0.0)
+                        Color(.systemBackground).opacity(0.0),
                     ]),
                     startPoint: .top,
                     endPoint: .bottom
@@ -125,7 +125,6 @@ struct MainView: View {
             }
             .ignoresSafeArea(edges: .top)
             .zIndex(1.5)
-
 
             // Overlay the fullscreen image if needed
             if let presented = fullScreenImage {
