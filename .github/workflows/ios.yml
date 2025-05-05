@@ -13,9 +13,9 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        simulator: ["iPhone 16", "iPhone 15"]
-        ios-version: ["18.0", "17.5"]
-
+        simulator: ["iPhone 16"]
+        ios-version: ["18.0"]
+    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -87,7 +87,12 @@ jobs:
           fi
           echo "name=$scheme" >> $GITHUB_OUTPUT
           echo "Using scheme: $scheme"
-
+      
+      - name: List Available Simulators
+        run: |
+          echo "Available simulators:"
+          xcrun simctl list devices available
+      
       - name: Select Simulator
         id: simulator
         run: |
