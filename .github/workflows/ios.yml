@@ -14,8 +14,8 @@ jobs:
     strategy:
       matrix:
         simulator: ["iPhone 16"]
-        ios-version: ["18.0"]
-    
+        ios-version: ["18.0.1"]
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
