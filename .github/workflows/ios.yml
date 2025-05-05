@@ -22,8 +22,19 @@ jobs:
 
       - name: Setup Xcode Version
         run: |
-          sudo xcode-select --switch /Applications/Xcode_16.0.app
-          xcodebuild -version
+          # Find available Xcode installations
+          xcode_path=$(mdfind "kMDItemKind == 'Application' && kMDItemFSName == 'Xcode.app'" | head -n 1)
+          if [ -z "$xcode_path" ]; then
+            echo "No Xcode installation found" >&2
+            exit 1
+          fi
+          sudo xcode-select --switch "$xcode_path"
+          # Verify Xcode version
+          xcode_version=$(xcodebuild -version | grep Xcode | awk '{print $2}')
+          echo "Selected Xcode version: $xcode_version"
+          if ! [[ "$xcode_version" =~ ^16\..* ]]; then
+            echo "Warning: Xcode version $xcode_version may not be compatible. Expected Xcode 16.x" >&2
+          fi
 
       - name: Cache Pods
         uses: actions/cache@v4
@@ -56,7 +67,7 @@ jobs:
           if ls *.xcworkspace >/dev/null 2>&1; then
             echo "filetype=workspace" >> $GITHUB_OUTPUT
             echo "file=$(ls *.xcworkspace)" >> $GITHUB_OUTPUT
-          elif ls *.xcodeproj >/dev/null  vendar: |
+          elif ls *.xcodeproj >/dev/null 2>&1; then
             echo "filetype=project" >> $GITHUB_OUTPUT
             echo "file=$(ls *.xcodeproj)" >> $GITHUB_OUTPUT
           else
