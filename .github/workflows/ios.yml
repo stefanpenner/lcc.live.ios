@@ -1,0 +1,106 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    name: Build and Test iOS App
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode Version
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_16.0.app
+          xcodebuild -version
+
+      - name: Cache Pods
+        uses: actions/cache@v4
+        with:
+          path: Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install Dependencies
+        run: |
+          if [ -f "Podfile" ]; then
+            pod install --repo-update
+          fi
+
+      - name: Determine Project Type
+        id: project
+        run: |
+          if ls *.xcworkspace >/dev/null 2>&1; then
+            echo "filetype=workspace" >> $GITHUB_OUTPUT
+            echo "file=$(ls *.xcworkspace)" >> $GITHUB_OUTPUT
+          elif ls *.xcodeproj >/dev/null 2>&1; then
+            echo "filetype=project" >> $GITHUB_OUTPUT
+            echo "file=$(ls *.xcodeproj)" >> $GITHUB_OUTPUT
+          else
+            echo "No Xcode project or workspace found" >&2
+            exit 1
+          fi
+
+      - name: Get Default Scheme
+        id: scheme
+        run: |
+          scheme=$(xcodebuild -list -json | jq -r '.project.targets[0]' || true)
+          if [ -z "$scheme" ]; then
+            echo "Could not determine scheme" >&2
+            exit 1
+          fi
+          echo "name=$scheme" >> $GITHUB_OUTPUT
+          echo "Using scheme: $scheme"
+
+      - name: Select Simulator
+        id: simulator
+        run: |
+          device=$(xcrun xctrace list devices 2>&1 | grep -oE 'iPhone 16 \([0-9.]+\)' | head -1 | sed 's/ (.*//')
+          if [ -z "$device" ]; then
+            device="iPhone 16"
+          fi
+          echo "name=$device" >> $GITHUB_OUTPUT
+          echo "Selected simulator: $device"
+
+      - name: Build
+        env:
+          SCHEME: ${{ steps.scheme.outputs.name }}
+          FILETYPE: ${{ steps.project.outputs.filetype }}
+          FILE: ${{ steps.project.outputs.file }}
+          DEVICE: ${{ steps.simulator.outputs.name }}
+        run: |
+          xcodebuild build-for-testing \
+            -${{ env.FILETYPE }} "${{ env.FILE }}" \
+            -scheme "${{ env.SCHEME }}" \
+            -destination "platform=iOS Simulator,name=${{ env.DEVICE }}" \
+            -enableCodeCoverage YES \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run Tests
+        env:
+          SCHEME: ${{ steps.scheme.outputs.name }}
+          FILETYPE: ${{ steps.project.outputs.filetype }}
+          FILE: ${{ steps.project.outputs.file }}
+          DEVICE: ${{ steps.simulator.outputs.name }}
+        run: |
+          xcodebuild test-without-building \
+            -${{ env.FILETYPE }} "${{ env.FILE }}" \
+            -scheme "${{ env.SCHEME }}" \
+            -destination "platform=iOS Simulator,name=${{ env.DEVICE }}" \
+            -enableCodeCoverage YES \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload Artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: ~/Library/Developer/Xcode/DerivedData/**/Logs/Build/*.xcactivitylog
