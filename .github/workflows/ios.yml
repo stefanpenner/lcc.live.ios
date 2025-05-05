@@ -61,16 +61,21 @@ jobs:
       - name: Determine Project Type
         id: project
         run: |
-          if ls *.xcworkspace >/dev/null 2>&1; then
-            echo "filetype=workspace" >> $GITHUB_OUTPUT
-            echo "file=$(ls *.xcworkspace)" >> $GITHUB_OUTPUT
-          elif ls *.xcodeproj >/dev/null 2>&1; then
+          # Look for a single .xcodeproj file
+          project_files=$(ls *.xcodeproj 2>/dev/null | wc -l)
+          if [ "$project_files" -eq 1 ]; then
             echo "filetype=project" >> $GITHUB_OUTPUT
-            echo "file=$(ls *.xcodeproj)" >> $GITHUB_OUTPUT
+            echo "file=$(ls *.xcodeproj | head -n 1)" >> $GITHUB_OUTPUT
+          elif [ "$project_files" -gt 1 ]; then
+            echo "Multiple .xcodeproj files found. Selecting the first one." >&2
+            echo "filetype=project" >> $GITHUB_OUTPUT
+            echo "file=$(ls *.xcodeproj | head -n 1)" >> $GITHUB_OUTPUT
           else
-            echo "No Xcode project or workspace found" >&2
+            echo "No Xcode project or workspace found in the repository root" >&2
+            ls -l
             exit 1
           fi
+          echo "Selected file: $(cat $GITHUB_OUTPUT | grep file= | cut -d= -f2)"
 
       - name: Get Default Scheme
         id: scheme
