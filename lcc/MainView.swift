@@ -87,6 +87,11 @@ struct MainView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
             .allowsHitTesting(!isAnyFullScreen)
             .ignoresSafeArea(edges: .top)
+            .onChange(of: selectedTab) {
+#if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+#endif
+            }
 
             // Top gradient overlay (at the very top, Photos app style)
             VStack(spacing: 0) {
