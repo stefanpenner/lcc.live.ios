@@ -40,21 +40,12 @@ struct MainView: View {
     @State private var isAnyFullScreen: Bool = false
     // Grid mode toggle state (now global)
     @State var gridMode: PhotoTabView.GridMode = .single
-    @State private var isToggleVisible: Bool = true
-    @State private var lastScrollDate: Date = .init()
     let tabBarHeight: CGFloat = 36
 
-    private let toggleFadeDuration: Double = 0.25
-    private let toggleHideDelay: Double = 1.0
-    private let floatingButtonSize: CGFloat = 36
-    private let floatingButtonPadding: CGFloat = 12
-    private var gridIcon: String { "square.grid.2x2" }
-    private var toggleAnimation: Animation { .easeInOut(duration: toggleFadeDuration) }
-
     // Tab info for custom tab bar
-    private let tabs: [(title: String, icon: String)] = [
-        ("lcc", "mountain.2"),
-        ("bcc", "mountain.2"),
+    private let tabs = [
+        "lcc",
+        "bcc"
     ]
 
     @State private var fullScreenImage: PresentedImage? = nil
@@ -64,12 +55,6 @@ struct MainView: View {
     var lccPhotoTab: some View {
         PhotoTabView(
             images: lccImages,
-            title: "lcc",
-            icon: "mountain.2",
-            selectedTab: $selectedTab,
-            tabIndex: 0,
-            tabCount: 2,
-            isFullScreen: $isAnyFullScreen,
             gridMode: $gridMode,
             onRequestFullScreen: { image in
                 overlayUUID = UUID()
@@ -83,12 +68,6 @@ struct MainView: View {
     var bccPhotoTab: some View {
         PhotoTabView(
             images: bccImages,
-            title: "bcc",
-            icon: "mountain.2",
-            selectedTab: $selectedTab,
-            tabIndex: 1,
-            tabCount: 2,
-            isFullScreen: $isAnyFullScreen,
             gridMode: $gridMode,
             onRequestFullScreen: { image in
                 overlayUUID = UUID()
@@ -140,10 +119,6 @@ struct MainView: View {
                     Spacer()
                     GridModeToggle(
                         gridMode: $gridMode,
-                        toggleAnimation: toggleAnimation,
-                        floatingButtonSize: floatingButtonSize,
-                        floatingButtonPadding: floatingButtonPadding,
-                        gridIcon: gridIcon
                     )
                     .padding(.bottom, 8)
                 }
@@ -162,7 +137,7 @@ struct MainView: View {
             }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
-        .onChange(of: selectedTab) { _ in
+        .onChange(of: selectedTab) {
             refreshImagesTrigger += 1
         }
         .onChange(of: scenePhase) { newPhase in

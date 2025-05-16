@@ -13,7 +13,6 @@ struct FullScreenImageView: View {
     @State private var isDragging = false
 
     var body: some View {
-        let fadeThreshold: CGFloat = 50
         // Background logic:
         // - While dragging: fixed moderate opacity
         // - Snapping back: animate to dark
@@ -102,4 +101,42 @@ private struct EscapeKeyHandler: UIViewRepresentable {
             }
         }
     }
+}
+
+#Preview {
+    // Mock image and preloader for preview
+    class MockPreloader: ImagePreloader {
+        override init() {
+            super.init()
+            let url = URL(string: "https://lcc.live/image/aHR0cHM6Ly9iYWNrZW5kLnJvdW5kc2hvdC5jb20vY2Ftcy80OGZjMjIzYzBlZDg4NDc0ZWNjMmY4ODRiZjM5ZGU2My9tZWRpdW0=")!
+        }
+    }
+    let url = URL(string: "hhttps://lcc.live/image/aHR0cHM6Ly9iYWNrZW5kLnJvdW5kc2hvdC5jb20vY2Ftcy80OGZjMjIzYzBlZDg4NDc0ZWNjMmY4ODRiZjM5ZGU2My9tZWRpdW0=")!
+    let preloader = MockPreloader()
+    
+    return FullScreenImageView(
+        url: url,
+        preloader: preloader,
+        onFlickDismiss: {}
+    )
+}
+
+
+
+#Preview("missing image") {
+    // Mock image and preloader for preview
+    class MockPreloader: ImagePreloader {
+        override init() {
+            super.init()
+            let url = URL(string: "https://example.com/missing.jpg")!
+        }
+    }
+    let url = URL(string: "https://example.com/missing.jpg")!
+    let preloader = MockPreloader()
+
+    return FullScreenImageView(
+        url: url,
+        preloader: preloader,
+        onFlickDismiss: {}
+    )
 }

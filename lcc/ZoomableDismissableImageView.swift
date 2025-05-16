@@ -13,6 +13,7 @@ struct ZoomableDismissableImageView: View {
 
     var body: some View {
         let fadeThreshold: CGFloat = 50
+        
         Image(uiImage: image)
             .resizable()
             .aspectRatio(contentMode: .fit)
@@ -75,5 +76,15 @@ struct ZoomableDismissableImageView: View {
                 isDragging = false
                 isSnappingBack = false
             }
+    }
+}
+
+#Preview {
+    GeometryReader { geometry in
+        ZoomableDismissableImageView(
+            image: UIImage(systemName: "photo")!.withRenderingMode(.alwaysTemplate),
+            geometry: geometry,
+            onFlickDismiss: {}
+        )
     }
 }

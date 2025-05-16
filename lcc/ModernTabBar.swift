@@ -1,11 +1,15 @@
 import SwiftUI
 
 struct ModernTabBar: View {
-    let tabs: [(title: String, icon: String)]
+    let tabs: [String]
     @Binding var selectedTab: Int
 
     var body: some View {
         HStack(spacing: 8) {
+            Image(systemName: "mountain.2")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.secondary)
+
             ForEach(0 ..< tabs.count, id: \.self) { idx in
                 Button(action: {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -16,11 +20,7 @@ struct ModernTabBar: View {
                     }
                 }) {
                     HStack(spacing: 6) {
-                        Image(systemName: tabs[idx].icon)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(selectedTab == idx ? .primary : .secondary)
-                            .scaleEffect(selectedTab == idx ? 1.15 : 1.0)
-                        Text(tabs[idx].title.uppercased())
+                        Text(tabs[idx].uppercased())
                             .font(.system(size: 15, weight: .medium))
                             .foregroundColor(selectedTab == idx ? .primary : .secondary)
                     }
@@ -50,4 +50,14 @@ struct ModernTabBar: View {
         .frame(maxWidth: 420)
         .offset(y: 8)
     }
+}
+
+#Preview {
+    ModernTabBar(
+        tabs: [
+            "LCC",
+            "BCC",
+        ],
+        selectedTab: .constant(0)
+    )
 }

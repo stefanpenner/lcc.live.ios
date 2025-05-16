@@ -5,6 +5,10 @@ private struct ToggleButton: View {
     @Binding var currentMode: PhotoTabView.GridMode
     var systemName: String
     var action: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+
+    var isSelected: Bool { mode == currentMode }
+
     var body: some View {
         Button(action: {
             #if os(iOS)
@@ -13,25 +17,31 @@ private struct ToggleButton: View {
             action()
         }) {
             Image(systemName: systemName)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(mode == currentMode ? .accentColor : .secondary)
-                .padding(6)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundColor(isSelected ? .accentColor : .secondary)
+                .frame(width: 44, height: 44)
                 .background(
-                    Circle()
-                        .fill(mode == currentMode ? Color.accentColor.opacity(0.15) : Color.clear)
+                    Group {
+                        if isSelected {
+                            Circle()
+                                .fill(Color.accentColor.opacity(0.18))
+                                .shadow(color: Color.accentColor.opacity(0.18), radius: 4, y: 1)
+                        } else {
+                            Color.clear
+                        }
+                    }
                 )
+                .animation(.easeInOut(duration: 0.18), value: isSelected)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Text(mode.rawValue))
+        .accessibilityValue(Text(isSelected ? "Selected" : "Not selected"))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
 struct GridModeToggle: View {
     @Binding var gridMode: PhotoTabView.GridMode
-
-    var toggleAnimation: Animation
-    var floatingButtonSize: CGFloat
-    var floatingButtonPadding: CGFloat
-    var gridIcon: String
 
     var body: some View {
         HStack(spacing: 8) {
