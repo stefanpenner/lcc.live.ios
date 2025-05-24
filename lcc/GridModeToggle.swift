@@ -74,3 +74,15 @@ struct GridModeToggle: View {
         .padding([.top, .trailing], 8)
     }
 }
+
+struct GridModeTogglePreview : View {
+    @State private var gridMode: PhotoTabView.GridMode = .compact
+
+    var body : some View {
+        GridModeToggle(gridMode: $gridMode)
+    }
+}
+
+#Preview {
+    GridModeTogglePreview()
+}

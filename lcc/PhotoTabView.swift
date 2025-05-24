@@ -40,6 +40,7 @@ struct PhotoTabView: View {
                                 imageHeight: imageHeight,
                                 colorScheme: colorScheme,
                                 onTap: { _ in
+                                    print("onTap")
                                     if let url = URL(string: imageUrl), preloader.loadedImages[url] != nil {
                                         onRequestFullScreen(PresentedImage(url: url))
                                     }
@@ -154,11 +155,3 @@ struct PresentedImage: Identifiable, Equatable {
     let id = UUID()
     let url: URL
 }
-
-// DateFormatter for last refreshed
-private let dateFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .none
-    formatter.timeStyle = .medium
-    return formatter
-}()
