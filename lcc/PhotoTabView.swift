@@ -39,8 +39,7 @@ struct PhotoTabView: View {
                                 imageWidth: imageWidth,
                                 imageHeight: imageHeight,
                                 colorScheme: colorScheme,
-                                onTap: { _ in
-                                    print("onTap")
+                                onTap: {
                                     if let url = URL(string: imageUrl), preloader.loadedImages[url] != nil {
                                         onRequestFullScreen(PresentedImage(url: url))
                                     }
@@ -64,7 +63,7 @@ private struct PhotoCell: View {
     let imageWidth: CGFloat
     let imageHeight: CGFloat
     let colorScheme: ColorScheme
-    let onTap: (UIImage) -> Void
+    let onTap: () -> Void
 
     @EnvironmentObject var preloader: ImagePreloader
 
@@ -95,6 +94,9 @@ private struct PhotoCell: View {
                                 .clipped()
                                 .clipShape(RoundedRectangle(cornerRadius: 1))
                                 .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                                .onTapGesture {
+                                    onTap()
+                                }
                         case .failure:
                             VStack(spacing: 8) {
                                 Image(systemName: "exclamationmark.triangle.fill")
@@ -147,6 +149,7 @@ private struct PhotoCell: View {
                 .opacity(borderOpacity)
                 .animation(.easeInOut(duration: 0.4), value: borderOpacity)
         }
+       
     }
 }
 
