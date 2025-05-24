@@ -3,7 +3,7 @@ import UIKit
 
 struct FullScreenImageView: View {
     let url: URL
-    @ObservedObject var preloader: ImagePreloader
+    @EnvironmentObject var preloader: ImagePreloader
     var onFlickDismiss: (() -> Void)? = nil
 
     @State private var scale: CGFloat = 1.1
@@ -116,12 +116,10 @@ private struct EscapeKeyHandler: UIViewRepresentable {
     
     return FullScreenImageView(
         url: url,
-        preloader: preloader,
         onFlickDismiss: {}
     )
+    .environmentObject(preloader)
 }
-
-
 
 #Preview("missing image") {
     // Mock image and preloader for preview
@@ -136,7 +134,7 @@ private struct EscapeKeyHandler: UIViewRepresentable {
 
     return FullScreenImageView(
         url: url,
-        preloader: preloader,
         onFlickDismiss: {}
     )
+    .environmentObject(preloader)
 }

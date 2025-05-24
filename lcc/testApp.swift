@@ -44,12 +44,17 @@ struct lccApp: App {
         ]
     )
     
+    init() {
+        self.preloader.preloadImages(from: self.images.lcc)
+        self.preloader.preloadImages(from: self.images.bcc)
+    }
+    
     var body: some Scene {
         WindowGroup {
             MainView(
-                images: images,
-                preloader: preloader
+                images: images
             )
+            .environmentObject(preloader)
         }
     }
 }

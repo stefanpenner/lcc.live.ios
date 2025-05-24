@@ -7,7 +7,7 @@ struct PhotoTabView: View {
     
     @Binding public var gridMode: GridMode
     var onRequestFullScreen: (PresentedImage) -> Void
-    var preloader: ImagePreloader
+    @EnvironmentObject var preloader: ImagePreloader
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -46,7 +46,6 @@ struct PhotoTabView: View {
                                     }
                                 }
                             )
-                            .environmentObject(preloader)
                         }
                     }
                     .frame(maxWidth: .infinity)

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct MainView: View {
     let images: (lcc: [String], bcc: [String])
-    @StateObject var preloader: ImagePreloader;
+    @EnvironmentObject var preloader: ImagePreloader
 
     @State private var selectedTab = 0
     @State private var refreshImagesTrigger = 0
@@ -21,8 +21,7 @@ struct MainView: View {
             onRequestFullScreen: { image in
                 overlayUUID = UUID()
                 fullScreenImage = image
-            },
-            preloader: preloader
+            }
         )
         .tag(0)
     }
@@ -34,8 +33,7 @@ struct MainView: View {
             onRequestFullScreen: { image in
                 overlayUUID = UUID()
                 fullScreenImage = image
-            },
-            preloader: preloader
+            }
         )
         .tag(1)
     }
@@ -74,7 +72,7 @@ struct MainView: View {
             
             // Overlay the fullscreen image if needed
             if let presented = fullScreenImage {
-                FullScreenImageView(url: presented.url, preloader: preloader) {
+                FullScreenImageView(url: presented.url) {
                     withAnimation { fullScreenImage = nil }
                 }
                 .id(overlayUUID)
@@ -149,9 +147,9 @@ struct MainViewPreview : View {
                     "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTUuanBlZw==",
                     "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTYuanBlZw==",
                 ]
-            ),
-            preloader: ImagePreloader()
+            )
         )
+        .environmentObject(ImagePreloader())
     }
 }
 
