@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        simulator: ["iPhone 16"]
-        ios-version: ["17.4"]
+        simulator: ["iPhone 16 Pro Max"]
+        ios-version: ["18.4"]
 
     steps:
       - name: Checkout Repository

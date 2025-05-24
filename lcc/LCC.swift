@@ -1,5 +1,5 @@
 //
-//  testApp.swift
+//  LCC.swift
 //  lcc
 //
 //  Created by Stefan Penner on 4/30/25.
@@ -8,7 +8,8 @@
 import SwiftUI
 
 @main
-struct lccApp: App {
+struct LCC
+: App {
     let preloader = ImagePreloader()
     // TODO: hard-coded for now until we have an API
     let images = (lcc: [String], bcc: [String]) (
