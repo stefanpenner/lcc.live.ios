@@ -14,6 +14,10 @@ struct MainView: View {
     @State private var fullScreenImage: PresentedImage? = nil
     @State private var overlayUUID = UUID()
     
+    private var currentImages: [String] {
+        selectedTab == 0 ? images.lcc : images.bcc
+    }
+    
     var lccPhotoTab: some View {
         PhotoTabView(
             images: images.lcc,
@@ -46,7 +50,7 @@ struct MainView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .allowsHitTesting(!isAnyFullScreen)
-            .ignoresSafeArea(edges: .top)
+            .ignoresSafeArea(edges: [.top, .bottom])
             .onChange(of: selectedTab) {
 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -72,9 +76,13 @@ struct MainView: View {
             
             // Overlay the fullscreen image if needed
             if let presented = fullScreenImage {
-                FullScreenImageView(url: presented.url) {
-                    withAnimation { fullScreenImage = nil }
-                }
+                FullScreenImageGalleryView(
+                    images: currentImages,
+                    initialURL: presented.url,
+                    onDismiss: {
+                        withAnimation { fullScreenImage = nil }
+                    }
+                )
                 .id(overlayUUID)
                 .transition(.opacity)
                 .zIndex(3)

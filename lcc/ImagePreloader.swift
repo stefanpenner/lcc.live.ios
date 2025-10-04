@@ -40,6 +40,10 @@ class ImagePreloader: ObservableObject {
             self.lastRefreshed = Date()
         }
     }
+    
+    func retryImage(for url: URL) {
+        loadImage(for: url, forceRefresh: true)
+    }
 
     private func startBackgroundRefresh() {
         timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in

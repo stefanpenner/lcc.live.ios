@@ -10,6 +10,7 @@ struct PhotoTabView: View {
     @EnvironmentObject var preloader: ImagePreloader
 
     @Environment(\.colorScheme) var colorScheme
+    @State private var isRefreshing = false
 
     // User grid mode
     public enum GridMode: String, CaseIterable, Identifiable {
@@ -30,31 +31,64 @@ struct PhotoTabView: View {
             
             ScrollView {
                 VStack(spacing: 0) {
+                    // Pull-to-refresh area
                     Color.clear
                         .frame(height: 60)
-                    LazyVGrid(columns: gridItems, spacing: spacing) {
-                        ForEach(images, id: \.self) { imageUrl in
-                            PhotoCell(
-                                imageUrl: imageUrl,
-                                imageWidth: imageWidth,
-                                imageHeight: imageHeight,
-                                colorScheme: colorScheme,
-                                onTap: {
-                                    if let url = URL(string: imageUrl), preloader.loadedImages[url] != nil {
-                                        onRequestFullScreen(PresentedImage(url: url))
+                    
+                    // Last updated indicator
+                    LastUpdatedView(lastRefreshed: preloader.lastRefreshed)
+                        .padding(.bottom, 8)
+                    
+                    if images.isEmpty {
+                        EmptyStateView()
+                            .frame(width: availableWidth, height: geometry.size.height * 0.6)
+                    } else {
+                        LazyVGrid(columns: gridItems, spacing: spacing) {
+                            ForEach(images, id: \.self) { imageUrl in
+                                PhotoCell(
+                                    imageUrl: imageUrl,
+                                    imageWidth: imageWidth,
+                                    imageHeight: imageHeight,
+                                    colorScheme: colorScheme,
+                                    onTap: {
+                                        if let url = URL(string: imageUrl), preloader.loadedImages[url] != nil {
+                                            onRequestFullScreen(PresentedImage(url: url))
+                                        }
+                                    },
+                                    onRetry: {
+                                        if let url = URL(string: imageUrl) {
+                                            preloader.retryImage(for: url)
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
                 }
+            }
+            .refreshable {
+                await performRefresh()
+            }
+            .ignoresSafeArea(edges: .bottom)
+            .safeAreaInset(edge: .bottom) {
+                // Reserve space for the floating GridModeToggle
+                Color.clear
+                    .frame(height: 70)
             }
         }
         .onAppear {
             preloader.preloadImages(from: images)
             preloader.refreshImages()
         }
+    }
+    
+    private func performRefresh() async {
+        #if os(iOS)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+        preloader.refreshImages()
+        try? await Task.sleep(for: .milliseconds(500))
     }
 }
 
@@ -64,6 +98,7 @@ private struct PhotoCell: View {
     let imageHeight: CGFloat
     let colorScheme: ColorScheme
     let onTap: () -> Void
+    let onRetry: () -> Void
 
     @EnvironmentObject var preloader: ImagePreloader
 
@@ -85,46 +120,47 @@ private struct PhotoCell: View {
                         .onTapGesture {
                             onTap()
                         }
+                        .accessibilityLabel("Camera image")
+                        .accessibilityAddTraits(.isImage)
                 } else if preloader.loading.contains(url) {
-                    // Show loading state
-                    ProgressView()
+                    // Show shimmer loading state
+                    ShimmerView(width: imageWidth, height: imageHeight, colorScheme: colorScheme)
+                } else {
+                    // Show error state with retry
+                    Button(action: {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        onRetry()
+                    }) {
+                        VStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise.circle.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 36, height: 36)
+                                .foregroundColor(Color.accentColor.opacity(0.8))
+                            Text("Tap to retry")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                         .frame(width: imageWidth, height: imageHeight)
                         .background(
-                            LinearGradient(
-                                colors: colorScheme == .dark ?
-                                    [Color(red: 0.1, green: 0.1, blue: 0.15), Color(red: 0.15, green: 0.15, blue: 0.2)] :
-                                    [Color(red: 0.96, green: 0.89, blue: 0.90), Color(red: 0.85, green: 0.89, blue: 0.96)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                } else {
-                    // Show error state
-                    VStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 36, height: 36)
-                            .foregroundColor(Color.gray.opacity(0.8))
-                        Text("Could not load image")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(width: imageWidth, height: imageHeight)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(
-                                LinearGradient(
-                                    colors: colorScheme == .dark ?
-                                        [Color(red: 0.18, green: 0.13, blue: 0.13), Color(red: 0.22, green: 0.16, blue: 0.18)] :
-                                        [Color(red: 0.99, green: 0.95, blue: 0.92), Color(red: 0.95, green: 0.92, blue: 0.99)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(
+                                    LinearGradient(
+                                        colors: colorScheme == .dark ?
+                                            [Color(red: 0.18, green: 0.13, blue: 0.13), Color(red: 0.22, green: 0.16, blue: 0.18)] :
+                                            [Color(red: 0.99, green: 0.95, blue: 0.92), Color(red: 0.95, green: 0.92, blue: 0.99)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
                                 )
-                            )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Failed to load image")
+                    .accessibilityHint("Tap to retry loading")
                 }
             }
 
@@ -152,6 +188,121 @@ private struct PhotoCell: View {
 struct PresentedImage: Identifiable, Equatable {
     let id = UUID()
     let url: URL
+}
+
+// MARK: - Helper Views
+
+private struct LastUpdatedView: View {
+    let lastRefreshed: Date
+    @State private var currentTime = Date()
+    
+    private var timeAgo: String {
+        let seconds = Int(currentTime.timeIntervalSince(lastRefreshed))
+        if seconds < 5 {
+            return "Just now"
+        } else if seconds < 60 {
+            return "\(seconds)s ago"
+        } else if seconds < 3600 {
+            return "\(seconds / 60)m ago"
+        } else {
+            return "\(seconds / 3600)h ago"
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 11, weight: .medium))
+            Text(timeAgo)
+                .font(.system(size: 11, weight: .medium))
+        }
+        .foregroundColor(.secondary.opacity(0.7))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(Color(.systemBackground).opacity(0.7))
+        )
+        .onAppear {
+            Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                currentTime = Date()
+            }
+        }
+        .accessibilityLabel("Last updated \(timeAgo)")
+    }
+}
+
+private struct EmptyStateView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary.opacity(0.5))
+            Text("No Images Available")
+                .font(.title3)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+            Text("Pull down to refresh")
+                .font(.subheadline)
+                .foregroundColor(.secondary.opacity(0.7))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("No images available. Pull down to refresh.")
+    }
+}
+
+private struct ShimmerView: View {
+    let width: CGFloat
+    let height: CGFloat
+    let colorScheme: ColorScheme
+    
+    @State private var phase: CGFloat = 0
+    
+    var body: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: colorScheme == .dark ? [
+                        Color(red: 0.1, green: 0.1, blue: 0.15),
+                        Color(red: 0.15, green: 0.15, blue: 0.2),
+                        Color(red: 0.1, green: 0.1, blue: 0.15)
+                    ] : [
+                        Color(red: 0.96, green: 0.89, blue: 0.90),
+                        Color(red: 0.90, green: 0.93, blue: 0.98),
+                        Color(red: 0.96, green: 0.89, blue: 0.90)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .frame(width: width, height: height)
+            .mask(
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .black, location: 0.3),
+                                .init(color: .black, location: 0.7),
+                                .init(color: .clear, location: 1)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .offset(x: phase * width * 2 - width)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .onAppear {
+                withAnimation(
+                    .linear(duration: 1.5)
+                    .repeatForever(autoreverses: false)
+                ) {
+                    phase = 1
+                }
+            }
+            .accessibilityLabel("Loading image")
+    }
 }
 
 #Preview {
