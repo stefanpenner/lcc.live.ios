@@ -17,8 +17,21 @@ struct FullScreenImageGalleryView: View {
     @State private var dismissProgress: CGFloat = 0
     @State private var verticalOffset: CGFloat = 0
     @State private var isDismissing = false
-    @State private var isTransitioning = false
     @State private var retryingURLs: Set<URL> = []
+    
+    // Zoom state tracking
+    @State private var isImageZoomed = false
+    
+    // Gesture direction locking
+    @State private var gestureDirection: GestureDirection? = nil
+    
+    enum GestureDirection {
+        case horizontal
+        case vertical
+    }
+    
+    // Spacing between images
+    private let imageSpacing: CGFloat = 20
     
     init(images: [String], initialURL: URL, onDismiss: @escaping () -> Void) {
         self.images = images
@@ -38,76 +51,152 @@ struct FullScreenImageGalleryView: View {
                 Color.black
                     .opacity(1.0 - dismissProgress * 0.7)
                     .edgesIgnoringSafeArea(.all)
-                    .onTapGesture {
-                        print("DEBUG: Tap on background")
-                        toggleControls()
-                    }
                 
-                // Current image only - prevents adjacent images from showing
+                // Carousel with current, previous, and next images for seamless swiping
                 ZStack {
+                    // Previous image (left)
+                    if currentIndex > 0, let imageUrlString = images[safe: currentIndex - 1],
+                       let url = URL(string: imageUrlString) {
+                        ZStack {
+                            if let image = preloader.loadedImages[url] {
+                                ZoomableDismissableImageView(
+                                    image: image,
+                                    geometry: geometry,
+                                    onFlickDismiss: onDismiss,
+                                    onZoomChanged: { isZoomed in
+                                        isImageZoomed = isZoomed
+                                    }
+                                )
+                            } else if preloader.loading.contains(url) {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(1.5)
+                            } else {
+                                // Placeholder for failed images
+                                Color.black.opacity(0.3)
+                            }
+                        }
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .offset(x: -(geometry.size.width + imageSpacing) + offset)
+                        .id("prev-\(currentIndex)")
+                    }
+                    
+                    // Current image (center)
                     if let imageUrlString = images[safe: currentIndex],
                        let url = URL(string: imageUrlString) {
-                        if let image = preloader.loadedImages[url] {
-                            ZoomableDismissableImageView(
-                                image: image,
-                                geometry: geometry,
-                                onFlickDismiss: onDismiss
-                            )
-                            .id(currentIndex) // Force recreation on index change
-                        } else if preloader.loading.contains(url) || retryingURLs.contains(url) {
-                            ProgressView()
-                                .tint(.white)
-                                .scaleEffect(1.5)
-                        } else {
-                            VStack(spacing: 16) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.white.opacity(0.7))
-                                Text("Image failed to load")
-                                    .foregroundColor(.white.opacity(0.7))
-                                Button(action: {
-                                    #if os(iOS)
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    #endif
-                                    retryingURLs.insert(url)
-                                    preloader.retryImage(for: url)
-                                    // Remove from retrying set after a delay to allow preloader.loading to take over
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        retryingURLs.remove(url)
+                        ZStack {
+                            if let image = preloader.loadedImages[url] {
+                                ZoomableDismissableImageView(
+                                    image: image,
+                                    geometry: geometry,
+                                    onFlickDismiss: onDismiss,
+                                    onZoomChanged: { isZoomed in
+                                        isImageZoomed = isZoomed
                                     }
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "arrow.clockwise")
-                                        Text("Retry")
+                                )
+                            } else if preloader.loading.contains(url) || retryingURLs.contains(url) {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(1.5)
+                            } else {
+                                VStack(spacing: 16) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Text("Image failed to load")
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Button(action: {
+                                        #if os(iOS)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        #endif
+                                        retryingURLs.insert(url)
+                                        preloader.retryImage(for: url)
+                                        // Remove from retrying set after a delay to allow preloader.loading to take over
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                            retryingURLs.remove(url)
+                                        }
+                                    }) {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "arrow.clockwise")
+                                            Text("Retry")
+                                        }
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.accentColor.opacity(0.2))
+                                        )
+                                        .foregroundColor(.accentColor)
                                     }
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.accentColor.opacity(0.2))
-                                    )
-                                    .foregroundColor(.accentColor)
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
+                                .allowsHitTesting(true)
                             }
-                            .allowsHitTesting(true)
                         }
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .offset(x: offset)
+                        .id("current-\(currentIndex)")
+                    }
+                    
+                    // Next image (right)
+                    if currentIndex < images.count - 1, let imageUrlString = images[safe: currentIndex + 1],
+                       let url = URL(string: imageUrlString) {
+                        ZStack {
+                            if let image = preloader.loadedImages[url] {
+                                ZoomableDismissableImageView(
+                                    image: image,
+                                    geometry: geometry,
+                                    onFlickDismiss: onDismiss,
+                                    onZoomChanged: { isZoomed in
+                                        isImageZoomed = isZoomed
+                                    }
+                                )
+                            } else if preloader.loading.contains(url) {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(1.5)
+                            } else {
+                                // Placeholder for failed images
+                                Color.black.opacity(0.3)
+                            }
+                        }
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .offset(x: (geometry.size.width + imageSpacing) + offset)
+                        .id("next-\(currentIndex)")
                     }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .contentShape(Rectangle()) // Make entire area tappable for gestures
-                .offset(x: offset, y: verticalOffset)
+                .offset(y: verticalOffset)
                 .scaleEffect(1.0 - dismissProgress * 0.15) // Subtle scale down as dismissing
                 .clipShape(RoundedRectangle(cornerRadius: dismissProgress * 16)) // Round corners as dismissing
+                .onTapGesture {
+                    toggleControls()
+                }
                 .simultaneousGesture(
-                    DragGesture(minimumDistance: 15)
+                    DragGesture(minimumDistance: 10)
                         .onChanged { value in
+                            // Don't allow page swiping when image is zoomed
+                            guard !isImageZoomed else { return }
+                            
                             let translation = value.translation
                             let horizontalMovement = abs(translation.width)
                             let verticalMovement = abs(translation.height)
                             
-                            // Determine if this is a horizontal or vertical gesture
-                            if verticalMovement > horizontalMovement && verticalMovement > 20 {
+                            // Lock in gesture direction on first significant movement
+                            if gestureDirection == nil {
+                                // Determine direction as soon as there's any meaningful movement
+                                if horizontalMovement > 5 || verticalMovement > 5 {
+                                    if verticalMovement > horizontalMovement {
+                                        gestureDirection = .vertical
+                                    } else {
+                                        gestureDirection = .horizontal
+                                    }
+                                }
+                            }
+                            
+                            // Handle gesture based on locked direction
+                            if gestureDirection == .vertical {
                                 // Vertical gesture for dismissal
                                 isDismissing = true
                                 isDragging = false
@@ -120,13 +209,16 @@ struct FullScreenImageGalleryView: View {
                                     verticalOffset = translation.height
                                     // Calculate progress (0 to 1)
                                     dismissProgress = min(1.0, translation.height / (geometry.size.height * 0.5))
+                                } else {
+                                    verticalOffset = 0
+                                    dismissProgress = 0
                                 }
-                            } else if horizontalMovement > 20 {
+                            } else if gestureDirection == .horizontal {
                                 // Horizontal gesture for navigation
                                 isDragging = true
                                 isDismissing = false
                                 
-                                // Lock vertical position during horizontal drag
+                                // ALWAYS lock vertical position during horizontal drag
                                 verticalOffset = 0
                                 dismissProgress = 0
                                 
@@ -136,9 +228,20 @@ struct FullScreenImageGalleryView: View {
                                 } else {
                                     offset = translation.width
                                 }
+                            } else {
+                                // No direction locked yet - keep everything at zero
+                                verticalOffset = 0
+                                dismissProgress = 0
+                                offset = 0
                             }
                         }
                         .onEnded { value in
+                            // Reset gesture direction lock for next gesture
+                            defer { gestureDirection = nil }
+                            
+                            // Don't allow page swiping when image is zoomed
+                            guard !isImageZoomed else { return }
+                            
                             let translation = value.translation
                             let horizontalMovement = abs(translation.width)
                             let verticalMovement = abs(translation.height)
@@ -173,6 +276,10 @@ struct FullScreenImageGalleryView: View {
                                 // Handle horizontal navigation
                                 isDragging = false
                                 
+                                // Ensure vertical offset is locked at zero
+                                verticalOffset = 0
+                                dismissProgress = 0
+                                
                                 let velocity = value.predictedEndTranslation.width - value.translation.width
                                 let threshold: CGFloat = geometry.size.width * 0.15
                                 let velocityThreshold: CGFloat = 500
@@ -182,41 +289,46 @@ struct FullScreenImageGalleryView: View {
                                 
                                 if shouldGoBack {
                                     #if os(iOS)
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     #endif
                                     
-                                    // Complete the slide animation
-                                    isTransitioning = true
-                                    withAnimation(.easeOut(duration: 0.2)) {
-                                        offset = geometry.size.width
+                                    // First complete the slide animation to the right
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85, blendDuration: 0)) {
+                                        offset = geometry.size.width + imageSpacing
+                                        verticalOffset = 0
+                                        dismissProgress = 0
                                     }
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    
+                                    // After animation completes, update index and reset offset
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                                         currentIndex -= 1
                                         offset = 0
-                                        isTransitioning = false
                                     }
                                     resetControlsTimer()
                                 } else if shouldGoForward {
                                     #if os(iOS)
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     #endif
                                     
-                                    // Complete the slide animation
-                                    isTransitioning = true
-                                    withAnimation(.easeOut(duration: 0.2)) {
-                                        offset = -geometry.size.width
+                                    // First complete the slide animation to the left
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85, blendDuration: 0)) {
+                                        offset = -(geometry.size.width + imageSpacing)
+                                        verticalOffset = 0
+                                        dismissProgress = 0
                                     }
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    
+                                    // After animation completes, update index and reset offset
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                                         currentIndex += 1
                                         offset = 0
-                                        isTransitioning = false
                                     }
                                     resetControlsTimer()
                                 } else {
-                                    // Snap back smoothly with your finger's momentum
-                                    let velocity = CGFloat(velocity) / geometry.size.width
-                                    withAnimation(.interpolatingSpring(mass: 1, stiffness: 300, damping: 30, initialVelocity: velocity)) {
+                                    // Snap back smoothly with spring physics
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.88)) {
                                         offset = 0
+                                        verticalOffset = 0
+                                        dismissProgress = 0
                                     }
                                 }
                             } else {
@@ -236,11 +348,37 @@ struct FullScreenImageGalleryView: View {
                         Spacer()
                         HStack(spacing: 6) {
                             ForEach(0..<images.count, id: \.self) { index in
-                                Circle()
-                                    .fill(index == currentIndex ? Color.white : Color.white.opacity(0.5))
-                                    .frame(width: 7, height: 7)
-                                    .scaleEffect(index == currentIndex ? 1.2 : 1.0)
-                                    .animation(.spring(response: 0.2, dampingFraction: 0.8), value: currentIndex)
+                                Button(action: {
+                                    // Don't navigate if already on this image or if zoomed
+                                    guard index != currentIndex && !isImageZoomed else { return }
+                                    
+                                    #if os(iOS)
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    #endif
+                                    
+                                    let direction = index > currentIndex ? -1 : 1
+                                    
+                                    // Animate to the new image
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85, blendDuration: 0)) {
+                                        offset = CGFloat(direction) * (geometry.size.width + imageSpacing)
+                                    }
+                                    
+                                    // Update index after animation
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                        currentIndex = index
+                                        offset = 0
+                                    }
+                                    
+                                    resetControlsTimer()
+                                }) {
+                                    Circle()
+                                        .fill(index == currentIndex ? Color.white : Color.white.opacity(0.5))
+                                        .frame(width: 7, height: 7)
+                                        .scaleEffect(index == currentIndex ? 1.2 : 1.0)
+                                        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: currentIndex)
+                                        .contentShape(Circle().scale(2.5)) // Larger tap target
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                         .padding(.horizontal, 16)
@@ -252,7 +390,6 @@ struct FullScreenImageGalleryView: View {
                         )
                         .padding(.bottom, 50)
                     }
-                    .allowsHitTesting(false)
                     .opacity(showControls && !isDismissing ? 1 : 0)
                     .scaleEffect(showControls && !isDismissing ? 1 : 0.9)
                     .animation(.easeInOut(duration: 0.25), value: showControls)

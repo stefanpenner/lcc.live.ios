@@ -27,7 +27,7 @@ struct FullScreenImageView: View {
 
                 Group {
                     if let image = preloader.loadedImages[url] {
-                        ZoomableDismissableImageView(image: image, geometry: geometry, onFlickDismiss: onFlickDismiss)
+                        ZoomableDismissableImageView(image: image, geometry: geometry, onFlickDismiss: onFlickDismiss, onZoomChanged: nil)
                     } else if preloader.loading.contains(url) {
                         ProgressView()
                             .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)

@@ -11,7 +11,7 @@ class APIService: ObservableObject {
     private var serverVersion: String?
     private var timer: Timer?
     private let checkInterval: TimeInterval = 30.0 // Check every 30 seconds
-    private let baseURL = "http://localhost:3000"
+    private let baseURL = "https://lcc.live"
     
     // Fallback data when API is not available
     private let fallbackLCCImages = [
