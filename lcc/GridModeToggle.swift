@@ -50,7 +50,6 @@ struct GridModeToggle: View {
                 currentMode: $gridMode,
                 systemName: "square.grid.2x2",
                 action: {
-                    print("compact")
                     gridMode = .compact
                 }
             )
@@ -60,7 +59,6 @@ struct GridModeToggle: View {
                 currentMode: $gridMode,
                 systemName: "rectangle.fill",
                 action: {
-                    print("single")
                     gridMode = .single
                 }
             )

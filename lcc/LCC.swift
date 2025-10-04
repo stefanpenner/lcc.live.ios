@@ -12,7 +12,7 @@ struct LCC
 : App {
     let preloader = ImagePreloader()
     // TODO: hard-coded for now until we have an API
-    let images = (lcc: [String], bcc: [String]) (
+    let images: (lcc: [String], bcc: [String]) = (
         lcc: [
             "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzg2MTFlMjc2LTdlZTUtNDJjMC1iOGNkLWQ5ZTE4OTBlMWNkNC9zbmFwc2hvdA==",
             "https://lcc.live/image/aHR0cHM6Ly9hbHRhc2tpYXJlYS5zMy11cy13ZXN0LTIuYW1hem9uYXdzLmNvbS9tb3VudGFpbi1jYW1zL0NvbGxpbnNfU25vd19TdGFrZS5qcGc=",

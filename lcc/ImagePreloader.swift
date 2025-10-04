@@ -43,7 +43,6 @@ class ImagePreloader: ObservableObject {
 
     private func startBackgroundRefresh() {
         timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
-            print("Background refresh triggered at \(Date())")
             self?.backgroundRefresh()
         }
     }
@@ -68,28 +67,36 @@ class ImagePreloader: ObservableObject {
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
             if let error = error {
-                print("[ImagePreloader] Failed to download image for URL: \(url) - Error: \(error.localizedDescription)")
+                #if DEBUG
+                NSLog("[ImagePreloader] Failed to download image for URL: \(url) - Error: \(error.localizedDescription)")
+                #endif
                 DispatchQueue.main.async {
                     self.loading.remove(url)
                 }
                 return
             }
             guard let data = data, data.count > 100 else {
-                print("[ImagePreloader] Image data for URL \(url) is too small or missing.")
+                #if DEBUG
+                NSLog("[ImagePreloader] Image data for URL \(url) is too small or missing.")
+                #endif
                 DispatchQueue.main.async {
                     self.loading.remove(url)
                 }
                 return
             }
             guard let image = UIImage(data: data) else {
-                print("[ImagePreloader] Failed to decode image for URL: \(url). Data length: \(data.count)")
+                #if DEBUG
+                NSLog("[ImagePreloader] Failed to decode image for URL: \(url). Data length: \(data.count)")
+                #endif
                 DispatchQueue.main.async {
                     self.loading.remove(url)
                 }
                 return
             }
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("[ImagePreloader] No HTTP response for URL: \(url)")
+                #if DEBUG
+                NSLog("[ImagePreloader] No HTTP response for URL: \(url)")
+                #endif
                 DispatchQueue.main.async {
                     self.loading.remove(url)
                 }
