@@ -7,12 +7,20 @@ struct MainView: View {
     @State private var selectedTab = 0
     @State private var refreshImagesTrigger = 0
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var isAnyFullScreen: Bool = false
     @State private var gridMode: PhotoTabView.GridMode = .single
     let tabBarHeight: CGFloat = 36
     
+    private var isLandscape: Bool {
+        verticalSizeClass == .compact
+    }
+    
     @State private var fullScreenImage: PresentedImage? = nil
     @State private var overlayUUID = UUID()
+    @State private var showUIControls = true
+    @State private var uiControlsTimer: Timer?
     
     private var currentImages: [String] {
         selectedTab == 0 ? images.lcc : images.bcc
@@ -25,7 +33,9 @@ struct MainView: View {
             onRequestFullScreen: { image in
                 overlayUUID = UUID()
                 fullScreenImage = image
-            }
+            },
+            onScrollActivity: resetUIControlsTimer,
+            onScrollDirectionChanged: handleScrollDirection
         )
         .tag(0)
     }
@@ -37,9 +47,33 @@ struct MainView: View {
             onRequestFullScreen: { image in
                 overlayUUID = UUID()
                 fullScreenImage = image
-            }
+            },
+            onScrollActivity: resetUIControlsTimer,
+            onScrollDirectionChanged: handleScrollDirection
         )
         .tag(1)
+    }
+    
+    private func resetUIControlsTimer() {
+        // Show controls when any scroll activity detected
+        withAnimation(.easeOut(duration: 0.3)) {
+            showUIControls = true
+        }
+    }
+    
+    private func handleScrollDirection(_ direction: PhotoTabView.ScrollDirection) {
+        withAnimation(.easeOut(duration: 0.3)) {
+            switch direction {
+            case .down:
+                // Scrolling down - hide controls
+                showUIControls = false
+            case .up:
+                // Scrolling up - show controls
+                showUIControls = true
+            case .idle:
+                break
+            }
+        }
     }
     
     var body: some View {
@@ -58,21 +92,26 @@ struct MainView: View {
             }
             
             // Top gradient overlay (at the very top, Photos app style)
-            VStack(spacing: 0) {
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(.systemBackground).opacity(0.95),
-                        Color(.systemBackground).opacity(0.7),
-                        Color(.systemBackground).opacity(0.0),
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 80)
-                Spacer()
+            if fullScreenImage == nil {
+                VStack(spacing: 0) {
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color(.systemBackground).opacity(0.95),
+                            Color(.systemBackground).opacity(0.7),
+                            Color(.systemBackground).opacity(0.0),
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 80)
+                    Spacer()
+                }
+                .ignoresSafeArea(edges: .top)
+                .zIndex(1.5)
+                .opacity(showUIControls ? 1 : 0)
+                .animation(.easeOut(duration: 0.3), value: showUIControls)
+                .allowsHitTesting(false) // Don't intercept touches - let them pass through to buttons
             }
-            .ignoresSafeArea(edges: .top)
-            .zIndex(1.5)
             
             // Overlay the fullscreen image if needed
             if let presented = fullScreenImage {
@@ -94,6 +133,8 @@ struct MainView: View {
                         gridMode: $gridMode,
                     )
                     .padding(.bottom, 8)
+                    .opacity(showUIControls ? 1 : 0)
+                    .animation(.easeOut(duration: 0.3), value: showUIControls)
                 }
                 .zIndex(2)
             }
@@ -105,8 +146,11 @@ struct MainView: View {
                     selectedTab: $selectedTab
                 )
                 .frame(height: tabBarHeight)
-                .padding(.top, 4)
-                .zIndex(2)
+                .padding(.top, isLandscape ? 12 : 4)
+                .zIndex(10) // High zIndex to ensure it's above gradient
+                .opacity(showUIControls ? 1 : 0)
+                .offset(y: showUIControls ? 0 : -10)
+                .animation(.easeOut(duration: 0.3), value: showUIControls)
             }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)

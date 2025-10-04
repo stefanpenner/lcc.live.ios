@@ -5,7 +5,7 @@ struct ZoomableDismissableImageView: View {
     let geometry: GeometryProxy
     let onFlickDismiss: (() -> Void)?
 
-    @State private var scale: CGFloat = 1.1
+    @State private var scale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var isDismissing = false
     @State private var isSnappingBack = false
@@ -22,7 +22,6 @@ struct ZoomableDismissableImageView: View {
             .scaleEffect(scale)
             .offset(offset)
             .opacity(isDismissing ? 0 : 1)
-            .shadow(color: .black.opacity(0.5), radius: 32, x: 0, y: 8)
             .gesture(
                 MagnificationGesture()
                     .onChanged { value in
@@ -71,7 +70,7 @@ struct ZoomableDismissableImageView: View {
             )
             .onChange(of: image) { _ in
                 offset = .zero
-                scale = 1.1
+                scale = 1.0
                 isDismissing = false
                 isDragging = false
                 isSnappingBack = false

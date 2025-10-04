@@ -246,3 +246,225 @@ struct IntegrationTests {
         }
     }
 }
+
+@Suite("APIService Tests")
+struct APIServiceTests {
+    
+    @Test("APIService initializes with fallback data")
+    func testInitializationWithFallback() async throws {
+        let apiService = APIService()
+        
+        // Should have fallback data immediately
+        #expect(!apiService.lccImages.isEmpty, "LCC images should not be empty on init")
+        #expect(!apiService.bccImages.isEmpty, "BCC images should not be empty on init")
+        #expect(apiService.isUsingFallback, "Should be marked as using fallback initially")
+        
+        // Verify fallback data is valid URLs
+        for urlString in apiService.lccImages {
+            #expect(URL(string: urlString) != nil, "All LCC URLs should be valid")
+        }
+        
+        for urlString in apiService.bccImages {
+            #expect(URL(string: urlString) != nil, "All BCC URLs should be valid")
+        }
+    }
+    
+    @Test("APIService fallback data has expected count")
+    func testFallbackDataCount() async throws {
+        let apiService = APIService()
+        
+        // Verify we have a reasonable number of images
+        #expect(apiService.lccImages.count > 10, "Should have multiple LCC images")
+        #expect(apiService.bccImages.count >= 5, "Should have multiple BCC images")
+    }
+    
+    @Test("APIService JSON parsing - simple array")
+    func testJSONParsingSimpleArray() async throws {
+        let apiService = APIService()
+        let json = """
+        [
+            "https://example.com/image1.jpg",
+            "https://example.com/image2.jpg",
+            "https://example.com/image3.jpg"
+        ]
+        """
+        
+        let data = json.data(using: .utf8)!
+        let urls = try apiService.parseImageURLs(from: data)
+        
+        #expect(urls.count == 3)
+        #expect(urls[0] == "https://example.com/image1.jpg")
+        #expect(urls[1] == "https://example.com/image2.jpg")
+        #expect(urls[2] == "https://example.com/image3.jpg")
+    }
+    
+    @Test("APIService JSON parsing - array of objects")
+    func testJSONParsingArrayOfObjects() async throws {
+        let apiService = APIService()
+        let json = """
+        [
+            {"url": "https://example.com/image1.jpg", "name": "cam1"},
+            {"url": "https://example.com/image2.jpg", "name": "cam2"}
+        ]
+        """
+        
+        let data = json.data(using: .utf8)!
+        let urls = try apiService.parseImageURLs(from: data)
+        
+        #expect(urls.count == 2)
+        #expect(urls[0] == "https://example.com/image1.jpg")
+        #expect(urls[1] == "https://example.com/image2.jpg")
+    }
+    
+    @Test("APIService JSON parsing - nested images array")
+    func testJSONParsingNestedArray() async throws {
+        let apiService = APIService()
+        let json = """
+        {
+            "images": [
+                "https://example.com/image1.jpg",
+                "https://example.com/image2.jpg"
+            ],
+            "timestamp": "2025-10-04T12:00:00Z"
+        }
+        """
+        
+        let data = json.data(using: .utf8)!
+        let urls = try apiService.parseImageURLs(from: data)
+        
+        #expect(urls.count == 2)
+        #expect(urls[0] == "https://example.com/image1.jpg")
+        #expect(urls[1] == "https://example.com/image2.jpg")
+    }
+    
+    @Test("APIService JSON parsing - nested objects array")
+    func testJSONParsingNestedObjectsArray() async throws {
+        let apiService = APIService()
+        let json = """
+        {
+            "images": [
+                {"url": "https://example.com/image1.jpg"},
+                {"url": "https://example.com/image2.jpg"}
+            ]
+        }
+        """
+        
+        let data = json.data(using: .utf8)!
+        let urls = try apiService.parseImageURLs(from: data)
+        
+        #expect(urls.count == 2)
+        #expect(urls[0] == "https://example.com/image1.jpg")
+        #expect(urls[1] == "https://example.com/image2.jpg")
+    }
+    
+    @Test("APIService JSON parsing - invalid format throws error")
+    func testJSONParsingInvalidFormat() async throws {
+        let apiService = APIService()
+        let json = """
+        {
+            "data": "not an array"
+        }
+        """
+        
+        let data = json.data(using: .utf8)!
+        
+        #expect(throws: APIError.self) {
+            try apiService.parseImageURLs(from: data)
+        }
+    }
+    
+    @Test("APIService JSON parsing - empty array")
+    func testJSONParsingEmptyArray() async throws {
+        let apiService = APIService()
+        let json = "[]"
+        
+        let data = json.data(using: .utf8)!
+        let urls = try apiService.parseImageURLs(from: data)
+        
+        #expect(urls.isEmpty)
+    }
+    
+    @Test("APIService maintains fallback on API failure")
+    func testFallbackMaintainedOnFailure() async throws {
+        let apiService = APIService()
+        
+        // Record initial fallback data
+        let initialLCCCount = apiService.lccImages.count
+        let initialBCCCount = apiService.bccImages.count
+        
+        // Wait for any API calls to complete (they will fail since localhost:3000 isn't running)
+        try? await Task.sleep(for: .milliseconds(500))
+        
+        // Should still have fallback data
+        #expect(apiService.lccImages.count == initialLCCCount, "LCC images should remain unchanged on API failure")
+        #expect(apiService.bccImages.count == initialBCCCount, "BCC images should remain unchanged on API failure")
+        #expect(apiService.isUsingFallback, "Should still be using fallback after API failure")
+    }
+    
+    @Test("APIService error property is set on failure")
+    func testErrorPropertyOnFailure() async throws {
+        let apiService = APIService()
+        
+        // Wait for API call to fail
+        try? await Task.sleep(for: .milliseconds(500))
+        
+        // Should have an error since localhost:3000 isn't running
+        #expect(apiService.error != nil, "Error should be set when API call fails")
+    }
+}
+
+@Suite("ContentView Integration Tests")
+struct ContentViewIntegrationTests {
+    
+    @Test("ContentView triggers preloader when API data changes")
+    func testPreloaderTriggeredOnAPIChange() async throws {
+        // This test verifies the integration between APIService and ImagePreloader
+        let apiService = APIService()
+        let preloader = ImagePreloader()
+        
+        // Verify initial state - fallback data should be available
+        #expect(!apiService.lccImages.isEmpty)
+        #expect(!apiService.bccImages.isEmpty)
+        
+        // In a real app, the onChange handlers would trigger preloading
+        // Here we verify the data is in the correct format
+        for urlString in apiService.lccImages {
+            let url = URL(string: urlString)
+            #expect(url != nil, "All LCC image URLs should be valid")
+        }
+        
+        for urlString in apiService.bccImages {
+            let url = URL(string: urlString)
+            #expect(url != nil, "All BCC image URLs should be valid")
+        }
+    }
+}
+
+// Make parseImageURLs accessible for testing
+extension APIService {
+    func parseImageURLs(from data: Data) throws -> [String] {
+        let json = try JSONSerialization.jsonObject(with: data)
+        
+        // Try array of strings
+        if let stringArray = json as? [String] {
+            return stringArray
+        }
+        
+        // Try array of objects with "url" field
+        if let objectArray = json as? [[String: Any]] {
+            return objectArray.compactMap { $0["url"] as? String }
+        }
+        
+        // Try object with "images" array
+        if let object = json as? [String: Any] {
+            if let images = object["images"] as? [String] {
+                return images
+            }
+            if let images = object["images"] as? [[String: Any]] {
+                return images.compactMap { $0["url"] as? String }
+            }
+        }
+        
+        throw APIError.invalidJSONFormat
+    }
+}

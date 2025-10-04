@@ -7,10 +7,20 @@ struct PhotoTabView: View {
     
     @Binding public var gridMode: GridMode
     var onRequestFullScreen: (PresentedImage) -> Void
+    var onScrollActivity: (() -> Void)?
+    var onScrollDirectionChanged: ((ScrollDirection) -> Void)?
     @EnvironmentObject var preloader: ImagePreloader
 
     @Environment(\.colorScheme) var colorScheme
     @State private var isRefreshing = false
+    @State private var scrollOffset: CGFloat = 0
+    @State private var lastScrollOffset: CGFloat = 0
+    
+    enum ScrollDirection {
+        case up
+        case down
+        case idle
+    }
 
     // User grid mode
     public enum GridMode: String, CaseIterable, Identifiable {
@@ -34,10 +44,6 @@ struct PhotoTabView: View {
                     // Pull-to-refresh area
                     Color.clear
                         .frame(height: 60)
-                    
-                    // Last updated indicator
-                    LastUpdatedView(lastRefreshed: preloader.lastRefreshed)
-                        .padding(.bottom, 8)
                     
                     if images.isEmpty {
                         EmptyStateView()
@@ -64,7 +70,31 @@ struct PhotoTabView: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
+                        .background(
+                            GeometryReader { scrollGeo in
+                                Color.clear
+                                    .preference(key: ScrollOffsetPreferenceKey.self, value: scrollGeo.frame(in: .named("scroll")).minY)
+                            }
+                        )
                     }
+                }
+            }
+            .coordinateSpace(name: "scroll")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                let delta = value - lastScrollOffset
+                
+                // Detect scroll direction with threshold to avoid jitter
+                if abs(delta) > 10 {
+                    if delta < -50 {
+                        // Scrolling down (content moving up)
+                        onScrollDirectionChanged?(.down)
+                    } else if delta > 50 {
+                        // Scrolling up (content moving down)
+                        onScrollDirectionChanged?(.up)
+                    }
+                    
+                    onScrollActivity?()
+                    lastScrollOffset = value
                 }
             }
             .refreshable {
@@ -101,6 +131,7 @@ private struct PhotoCell: View {
     let onRetry: () -> Void
 
     @EnvironmentObject var preloader: ImagePreloader
+    @State private var isRetrying = false
 
     var body: some View {
         let url = URL(string: imageUrl)!
@@ -122,7 +153,7 @@ private struct PhotoCell: View {
                         }
                         .accessibilityLabel("Camera image")
                         .accessibilityAddTraits(.isImage)
-                } else if preloader.loading.contains(url) {
+                } else if preloader.loading.contains(url) || isRetrying {
                     // Show shimmer loading state
                     ShimmerView(width: imageWidth, height: imageHeight, colorScheme: colorScheme)
                 } else {
@@ -131,7 +162,13 @@ private struct PhotoCell: View {
                         #if os(iOS)
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         #endif
+                        isRetrying = true
                         onRetry()
+                        // Reset after brief delay to allow loading state to show
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(300))
+                            isRetrying = false
+                        }
                     }) {
                         VStack(spacing: 8) {
                             Image(systemName: "arrow.clockwise.circle.fill")
@@ -305,6 +342,14 @@ private struct ShimmerView: View {
     }
 }
 
+// Preference key for scroll offset tracking
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 #Preview {
     let preloader = ImagePreloader()
     let images = [
@@ -323,7 +368,9 @@ private struct ShimmerView: View {
     return PhotoTabView(
         images: images,
         gridMode: .constant(PhotoTabView.GridMode.single),
-        onRequestFullScreen: { _ in })
+        onRequestFullScreen: { _ in },
+        onScrollActivity: nil,
+        onScrollDirectionChanged: nil)
     .environmentObject(preloader)
 }
 
@@ -356,6 +403,8 @@ private struct ShimmerView: View {
     return PhotoTabView(
         images: images,
         gridMode: .constant(PhotoTabView.GridMode.compact),
-        onRequestFullScreen: { _ in })
+        onRequestFullScreen: { _ in },
+        onScrollActivity: nil,
+        onScrollDirectionChanged: nil)
     .environmentObject(MockImagePreloader())
 }
