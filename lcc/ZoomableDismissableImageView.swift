@@ -68,7 +68,7 @@ struct ZoomableDismissableImageView: View {
                         }
                     }
             )
-            .onChange(of: image) { _ in
+            .onChange(of: image) {
                 offset = .zero
                 scale = 1.0
                 isDismissing = false

@@ -157,12 +157,12 @@ struct MainView: View {
         .onChange(of: selectedTab) {
             refreshImagesTrigger += 1
         }
-        .onChange(of: scenePhase) { newPhase in
+        .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 refreshImagesTrigger += 1
             }
         }
-        .onChange(of: fullScreenImage) { newValue in
+        .onChange(of: fullScreenImage) { _, newValue in
             isAnyFullScreen = newValue != nil
         }
     }

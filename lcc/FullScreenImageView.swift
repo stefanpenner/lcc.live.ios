@@ -54,7 +54,7 @@ struct FullScreenImageView: View {
         }
         .frame(width: 0, height: 0)
         .statusBar(hidden: true)
-        .onChange(of: preloader.loadedImages[url]) { _ in
+        .onChange(of: preloader.loadedImages[url]) {
             offset = .zero
             scale = 1.1
             isDismissing = false
@@ -108,7 +108,7 @@ private struct EscapeKeyHandler: UIViewRepresentable {
     class MockPreloader: ImagePreloader {
         override init() {
             super.init()
-            let url = URL(string: "https://lcc.live/image/aHR0cHM6Ly9iYWNrZW5kLnJvdW5kc2hvdC5jb20vY2Ftcy80OGZjMjIzYzBlZDg4NDc0ZWNjMmY4ODRiZjM5ZGU2My9tZWRpdW0=")!
+            _ = URL(string: "https://lcc.live/image/aHR0cHM6Ly9iYWNrZW5kLnJvdW5kc2hvdC5jb20vY2Ftcy80OGZjMjIzYzBlZDg4NDc0ZWNjMmY4ODRiZjM5ZGU2My9tZWRpdW0=")!
         }
     }
     let url = URL(string: "hhttps://lcc.live/image/aHR0cHM6Ly9iYWNrZW5kLnJvdW5kc2hvdC5jb20vY2Ftcy80OGZjMjIzYzBlZDg4NDc0ZWNjMmY4ODRiZjM5ZGU2My9tZWRpdW0=")!
@@ -126,7 +126,7 @@ private struct EscapeKeyHandler: UIViewRepresentable {
     class MockPreloader: ImagePreloader {
         override init() {
             super.init()
-            let url = URL(string: "https://example.com/missing.jpg")!
+            _ = URL(string: "https://example.com/missing.jpg")!
         }
     }
     let url = URL(string: "https://example.com/missing.jpg")!
