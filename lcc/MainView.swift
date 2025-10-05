@@ -127,17 +127,27 @@ struct MainView: View {
                 .offset(x: -CGFloat(selectedTab) * geometry.size.width + dragOffset)
                 .allowsHitTesting(!isAnyFullScreen)
                 .ignoresSafeArea(edges: [.top, .bottom])
-                .gesture(
-                    DragGesture(minimumDistance: 10)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 20)
                         .onChanged { value in
                             // Only allow horizontal dragging when not in fullscreen
                             guard fullScreenMedia == nil else { return }
                             
                             let translation = value.translation.width
-                            let verticalTranslation = abs(value.translation.height)
+                            let verticalTranslation = value.translation.height
+                            
+                            // Determine if this is primarily a horizontal gesture
+                            // Require 3x more horizontal than vertical to activate
+                            let isHorizontal = abs(translation) > abs(verticalTranslation) * 3
                             
                             // Only respond to primarily horizontal gestures
-                            guard abs(translation) > verticalTranslation * 1.5 else { return }
+                            guard isHorizontal else { 
+                                // Reset if we started horizontal but went vertical
+                                if dragOffset != 0 {
+                                    dragOffset = 0
+                                }
+                                return 
+                            }
                             
                             // Add resistance at edges
                             if (selectedTab == 0 && translation > 0) || (selectedTab == 1 && translation < 0) {
@@ -150,6 +160,20 @@ struct MainView: View {
                             guard fullScreenMedia == nil else { return }
                             
                             let translation = value.translation.width
+                            let verticalTranslation = value.translation.height
+                            
+                            // Check if this was primarily horizontal
+                            // Require 3x more horizontal than vertical to switch tabs
+                            let isHorizontal = abs(translation) > abs(verticalTranslation) * 3
+                            
+                            guard isHorizontal else {
+                                // Not horizontal enough, just reset
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    dragOffset = 0
+                                }
+                                return
+                            }
+                            
                             let velocity = value.predictedEndTranslation.width - value.translation.width
                             let threshold: CGFloat = geometry.size.width * 0.25
                             let velocityThreshold: CGFloat = 400
