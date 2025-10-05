@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MainView: View {
-    let images: (lcc: [String], bcc: [String])
+    let mediaItems: (lcc: [MediaItem], bcc: [MediaItem])
     @EnvironmentObject var preloader: ImagePreloader
 
     @State private var selectedTab = 0
@@ -17,22 +17,22 @@ struct MainView: View {
         verticalSizeClass == .compact
     }
     
-    @State private var fullScreenImage: PresentedImage? = nil
+    @State private var fullScreenMedia: PresentedMedia? = nil
     @State private var overlayUUID = UUID()
     @State private var showUIControls = true
     @State private var uiControlsTimer: Timer?
     
-    private var currentImages: [String] {
-        selectedTab == 0 ? images.lcc : images.bcc
+    private var currentMediaItems: [MediaItem] {
+        selectedTab == 0 ? mediaItems.lcc : mediaItems.bcc
     }
     
     var lccPhotoTab: some View {
         PhotoTabView(
-            images: images.lcc,
+            mediaItems: mediaItems.lcc,
             gridMode: $gridMode,
-            onRequestFullScreen: { image in
+            onRequestFullScreen: { media in
                 overlayUUID = UUID()
-                fullScreenImage = image
+                fullScreenMedia = media
             },
             onScrollActivity: resetUIControlsTimer,
             onScrollDirectionChanged: handleScrollDirection
@@ -42,11 +42,11 @@ struct MainView: View {
     
     var bccPhotoTab: some View {
         PhotoTabView(
-            images: images.bcc,
+            mediaItems: mediaItems.bcc,
             gridMode: $gridMode,
-            onRequestFullScreen: { image in
+            onRequestFullScreen: { media in
                 overlayUUID = UUID()
-                fullScreenImage = image
+                fullScreenMedia = media
             },
             onScrollActivity: resetUIControlsTimer,
             onScrollDirectionChanged: handleScrollDirection
@@ -92,7 +92,7 @@ struct MainView: View {
             }
             
             // Top gradient overlay (at the very top, Photos app style)
-            if fullScreenImage == nil {
+            if fullScreenMedia == nil {
                 VStack(spacing: 0) {
                     LinearGradient(
                         gradient: Gradient(colors: [
@@ -113,13 +113,13 @@ struct MainView: View {
                 .allowsHitTesting(false) // Don't intercept touches - let them pass through to buttons
             }
             
-            // Overlay the fullscreen image if needed
-            if let presented = fullScreenImage {
+            // Overlay the fullscreen media if needed
+            if let presented = fullScreenMedia {
                 FullScreenImageGalleryView(
-                    images: currentImages,
-                    initialURL: presented.url,
+                    mediaItems: currentMediaItems,
+                    initialMediaItem: presented.mediaItem,
                     onDismiss: {
-                        withAnimation { fullScreenImage = nil }
+                        withAnimation { fullScreenMedia = nil }
                     }
                 )
                 .id(overlayUUID)
@@ -140,7 +140,7 @@ struct MainView: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if fullScreenImage == nil {
+            if fullScreenMedia == nil {
                 ModernTabBar(
                     tabs: ["LCC", "BCC"],
                     selectedTab: $selectedTab
@@ -162,7 +162,7 @@ struct MainView: View {
                 refreshImagesTrigger += 1
             }
         }
-        .onChange(of: fullScreenImage) { _, newValue in
+        .onChange(of: fullScreenMedia) { _, newValue in
             isAnyFullScreen = newValue != nil
         }
     }
@@ -181,24 +181,28 @@ struct BlurView: UIViewRepresentable {
 
 struct MainViewPreview : View {
     var body: some View {
+        let lccUrls = [
+            "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzg2MTFlMjc2LTdlZTUtNDJjMC1iOGNkLWQ5ZTE4OTBlMWNkNC9zbmFwc2hvdA==",
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTQ2MDQuanBlZw==",
+            "https://youtube.com/embed/dQw4w9WgXcQ",
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTY2NDcuanBlZw==",
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjUuanBlZw==",
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjYuanBlZw==",
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjguanBlZw==",
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjkuanBlZw=="
+        ]
+        let bccUrls = [
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTQ2MDUuanBlZw==",
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTIuanBlZw==",
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTMuanBlZw==",
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTUuanBlZw==",
+            "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTYuanBlZw==",
+        ]
+        
         MainView(
-            images: (
-                lcc: [
-                    "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzg2MTFlMjc2LTdlZTUtNDJjMC1iOGNkLWQ5ZTE4OTBlMWNkNC9zbmFwc2hvdA==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTQ2MDQuanBlZw==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTY2NDcuanBlZw==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjUuanBlZw==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjYuanBlZw==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjguanBlZw==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjkuanBlZw=="
-                ],
-                bcc: [
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTQ2MDUuanBlZw==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTIuanBlZw==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTMuanBlZw==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTUuanBlZw==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyMTYuanBlZw==",
-                ]
+            mediaItems: (
+                lcc: lccUrls.compactMap { MediaItem.from(urlString: $0) },
+                bcc: bccUrls.compactMap { MediaItem.from(urlString: $0) }
             )
         )
         .environmentObject(ImagePreloader())

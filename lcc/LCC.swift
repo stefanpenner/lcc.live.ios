@@ -28,19 +28,19 @@ struct ContentView: View {
     
     var body: some View {
         MainView(
-            images: (
-                lcc: apiService.lccImages,
-                bcc: apiService.bccImages
+            mediaItems: (
+                lcc: apiService.lccMedia,
+                bcc: apiService.bccMedia
             )
         )
-        .onChange(of: apiService.lccImages) { oldValue, newValue in
+        .onChange(of: apiService.lccMedia) { oldValue, newValue in
             if !newValue.isEmpty {
-                preloader.preloadImages(from: newValue)
+                preloader.preloadMedia(from: newValue)
             }
         }
-        .onChange(of: apiService.bccImages) { oldValue, newValue in
+        .onChange(of: apiService.bccMedia) { oldValue, newValue in
             if !newValue.isEmpty {
-                preloader.preloadImages(from: newValue)
+                preloader.preloadMedia(from: newValue)
             }
         }
     }

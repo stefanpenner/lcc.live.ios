@@ -3,10 +3,10 @@ import Foundation
 import SwiftUI
 
 struct PhotoTabView: View {
-    let images: [String]
+    let mediaItems: [MediaItem]
     
     @Binding public var gridMode: GridMode
-    var onRequestFullScreen: (PresentedImage) -> Void
+    var onRequestFullScreen: (PresentedMedia) -> Void
     var onScrollActivity: (() -> Void)?
     var onScrollDirectionChanged: ((ScrollDirection) -> Void)?
     @EnvironmentObject var preloader: ImagePreloader
@@ -45,24 +45,22 @@ struct PhotoTabView: View {
                     Color.clear
                         .frame(height: 60)
                     
-                    if images.isEmpty {
+                    if mediaItems.isEmpty {
                         EmptyStateView()
                             .frame(width: availableWidth, height: geometry.size.height * 0.6)
                     } else {
                         LazyVGrid(columns: gridItems, spacing: spacing) {
-                            ForEach(images, id: \.self) { imageUrl in
-                                PhotoCell(
-                                    imageUrl: imageUrl,
+                            ForEach(mediaItems, id: \.id) { mediaItem in
+                                MediaCell(
+                                    mediaItem: mediaItem,
                                     imageWidth: imageWidth,
                                     imageHeight: imageHeight,
                                     colorScheme: colorScheme,
                                     onTap: {
-                                        if let url = URL(string: imageUrl), preloader.loadedImages[url] != nil {
-                                            onRequestFullScreen(PresentedImage(url: url))
-                                        }
+                                        onRequestFullScreen(PresentedMedia(mediaItem: mediaItem))
                                     },
                                     onRetry: {
-                                        if let url = URL(string: imageUrl) {
+                                        if !mediaItem.type.isVideo, let url = URL(string: mediaItem.url) {
                                             preloader.retryImage(for: url)
                                         }
                                     }
@@ -108,7 +106,7 @@ struct PhotoTabView: View {
             }
         }
         .onAppear {
-            preloader.preloadImages(from: images)
+            preloader.preloadMedia(from: mediaItems)
             preloader.refreshImages()
         }
     }
@@ -122,8 +120,8 @@ struct PhotoTabView: View {
     }
 }
 
-private struct PhotoCell: View {
-    let imageUrl: String
+private struct MediaCell: View {
+    let mediaItem: MediaItem
     let imageWidth: CGFloat
     let imageHeight: CGFloat
     let colorScheme: ColorScheme
@@ -134,97 +132,115 @@ private struct PhotoCell: View {
     @State private var isRetrying = false
 
     var body: some View {
-        let url = URL(string: imageUrl)!
-        let loadedImage = preloader.loadedImages[url]
-        
         ZStack(alignment: .top) {
             Group {
-                if let uiImage = loadedImage {
-                    // Show preloaded image
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: imageWidth, height: imageHeight)
-                        .clipped()
+                if mediaItem.type.isVideo {
+                    // Show YouTube thumbnail with play button
+                    if case .youtubeVideo(let embedURL) = mediaItem.type {
+                        YouTubeThumbnailView(
+                            embedURL: embedURL,
+                            width: imageWidth,
+                            height: imageHeight
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
                         .onTapGesture {
                             onTap()
                         }
-                        .accessibilityLabel("Camera image")
-                        .accessibilityAddTraits(.isImage)
-                } else if preloader.loading.contains(url) || isRetrying {
-                    // Show shimmer loading state
-                    ShimmerView(width: imageWidth, height: imageHeight, colorScheme: colorScheme)
-                } else {
-                    // Show error state with retry
-                    Button(action: {
-                        #if os(iOS)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        isRetrying = true
-                        onRetry()
-                        // Reset after brief delay to allow loading state to show
-                        Task {
-                            try? await Task.sleep(for: .milliseconds(300))
-                            isRetrying = false
-                        }
-                    }) {
-                        VStack(spacing: 8) {
-                            Image(systemName: "arrow.clockwise.circle.fill")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 36, height: 36)
-                                .foregroundColor(Color.accentColor.opacity(0.8))
-                            Text("Tap to retry")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(width: imageWidth, height: imageHeight)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(
-                                    LinearGradient(
-                                        colors: colorScheme == .dark ?
-                                            [Color(red: 0.18, green: 0.13, blue: 0.13), Color(red: 0.22, green: 0.16, blue: 0.18)] :
-                                            [Color(red: 0.99, green: 0.95, blue: 0.92), Color(red: 0.95, green: 0.92, blue: 0.99)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .accessibilityLabel("YouTube video")
+                        .accessibilityAddTraits(.isButton)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Failed to load image")
-                    .accessibilityHint("Tap to retry loading")
+                } else {
+                    // Show image (existing code)
+                    let url = URL(string: mediaItem.url)!
+                    let loadedImage = preloader.loadedImages[url]
+                    
+                    if let uiImage = loadedImage {
+                        // Show preloaded image
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: imageWidth, height: imageHeight)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                            .onTapGesture {
+                                onTap()
+                            }
+                            .accessibilityLabel("Camera image")
+                            .accessibilityAddTraits(.isImage)
+                    } else if preloader.loading.contains(url) || isRetrying {
+                        // Show shimmer loading state
+                        ShimmerView(width: imageWidth, height: imageHeight, colorScheme: colorScheme)
+                    } else {
+                        // Show error state with retry
+                        Button(action: {
+                            #if os(iOS)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                            isRetrying = true
+                            onRetry()
+                            // Reset after brief delay to allow loading state to show
+                            Task {
+                                try? await Task.sleep(for: .milliseconds(300))
+                                isRetrying = false
+                            }
+                        }) {
+                            VStack(spacing: 8) {
+                                Image(systemName: "arrow.clockwise.circle.fill")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 36, height: 36)
+                                    .foregroundColor(Color.accentColor.opacity(0.8))
+                                Text("Tap to retry")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(width: imageWidth, height: imageHeight)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: colorScheme == .dark ?
+                                                [Color(red: 0.18, green: 0.13, blue: 0.13), Color(red: 0.22, green: 0.16, blue: 0.18)] :
+                                                [Color(red: 0.99, green: 0.95, blue: 0.92), Color(red: 0.95, green: 0.92, blue: 0.99)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Failed to load image")
+                        .accessibilityHint("Tap to retry loading")
+                    }
+                    
+                    // Subtle border while updating (only for images)
+                    let isLoading = preloader.loading.contains(url)
+                    let fadeDate = preloader.fadingOut[url]
+                    let isFadingOut = fadeDate != nil
+                    let fadeProgress: CGFloat = {
+                        guard let fadeDate = fadeDate else { return 0 }
+                        let elapsed = CGFloat(Date().timeIntervalSince(fadeDate))
+                        let duration: CGFloat = 3.0
+                        return min(1, max(0, elapsed / duration))
+                    }()
+                    let borderOpacity: CGFloat = isFadingOut ? (1 - fadeProgress) : (isLoading ? 0.3 : 0)
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.accentColor.opacity(0.60), lineWidth: 4)
+                        .frame(width: imageWidth, height: imageHeight)
+                        .opacity(borderOpacity)
+                        .animation(.easeInOut(duration: 0.4), value: borderOpacity)
                 }
             }
-
-            // Subtle border while updating
-            let isLoading = preloader.loading.contains(url)
-            let fadeDate = preloader.fadingOut[url]
-            let isFadingOut = fadeDate != nil
-            let fadeProgress: CGFloat = {
-                guard let fadeDate = fadeDate else { return 0 }
-                let elapsed = CGFloat(Date().timeIntervalSince(fadeDate))
-                let duration: CGFloat = 3.0
-                return min(1, max(0, elapsed / duration))
-            }()
-            let borderOpacity: CGFloat = isFadingOut ? (1 - fadeProgress) : (isLoading ? 0.3 : 0)
-            RoundedRectangle(cornerRadius: 4)
-                .stroke(Color.accentColor.opacity(0.60), lineWidth: 4)
-                .frame(width: imageWidth, height: imageHeight)
-                .opacity(borderOpacity)
-                .animation(.easeInOut(duration: 0.4), value: borderOpacity)
         }
-       
     }
 }
 
-struct PresentedImage: Identifiable, Equatable {
+struct PresentedMedia: Identifiable, Equatable {
     let id = UUID()
-    let url: URL
+    let mediaItem: MediaItem
 }
 
 // MARK: - Helper Views
@@ -352,21 +368,22 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
 
 #Preview {
     let preloader = ImagePreloader()
-    let images = [
+    let mediaItems = [
         "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzg2MTFlMjc2LTdlZTUtNDJjMC1iOGNkLWQ5ZTE4OTBlMWNkNC9zbmFwc2hvdA==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTQ2MDQuanBlZw==",
+        "https://youtube.com/embed/dQw4w9WgXcQ",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTY2NDcuanBlZw==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjUuanBlZw==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjYuanBlZw==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjguanBlZw==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjkuanBlZw=="
-    ]
+    ].compactMap { MediaItem.from(urlString: $0) }
     
-    // Preload images immediately for preview
-    preloader.preloadImages(from: images)
+    // Preload media immediately for preview
+    preloader.preloadMedia(from: mediaItems)
     
     return PhotoTabView(
-        images: images,
+        mediaItems: mediaItems,
         gridMode: .constant(PhotoTabView.GridMode.single),
         onRequestFullScreen: { _ in },
         onScrollActivity: nil,
@@ -394,14 +411,14 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
         }
     }
     
-    let images = [
+    let mediaItems = [
         "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzg2MTFlMjc2LTdlZTUtNDJjMC1iOGNkLWQ5ZTE4OTBlMWNkNC9zbmFwc2hvdA==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTQ2MDQuanBlZw==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTY2NDcuanBlZw=="
-    ]
+    ].compactMap { MediaItem.from(urlString: $0) }
     
     return PhotoTabView(
-        images: images,
+        mediaItems: mediaItems,
         gridMode: .constant(PhotoTabView.GridMode.compact),
         onRequestFullScreen: { _ in },
         onScrollActivity: nil,

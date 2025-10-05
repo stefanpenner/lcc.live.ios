@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct FullScreenImageGalleryView: View {
-    let images: [String]
-    let initialURL: URL
+    let mediaItems: [MediaItem]
+    let initialMediaItem: MediaItem
     let onDismiss: () -> Void
     
     @EnvironmentObject var preloader: ImagePreloader
@@ -30,16 +30,16 @@ struct FullScreenImageGalleryView: View {
         case vertical
     }
     
-    // Spacing between images
-    private let imageSpacing: CGFloat = 20
+    // Spacing between images - set to 0 for seamless canvas feel
+    private let imageSpacing: CGFloat = 0
     
-    init(images: [String], initialURL: URL, onDismiss: @escaping () -> Void) {
-        self.images = images
-        self.initialURL = initialURL
+    init(mediaItems: [MediaItem], initialMediaItem: MediaItem, onDismiss: @escaping () -> Void) {
+        self.mediaItems = mediaItems
+        self.initialMediaItem = initialMediaItem
         self.onDismiss = onDismiss
         
         // Find the initial index
-        if let index = images.firstIndex(where: { URL(string: $0) == initialURL }) {
+        if let index = mediaItems.firstIndex(where: { $0.id == initialMediaItem.id }) {
             _currentIndex = State(initialValue: index)
         }
     }
@@ -52,117 +52,76 @@ struct FullScreenImageGalleryView: View {
                     .opacity(1.0 - dismissProgress * 0.7)
                     .edgesIgnoringSafeArea(.all)
                 
-                // Carousel with current, previous, and next images for seamless swiping
+                // Carousel with current, previous, and next media items for seamless swiping
                 ZStack {
-                    // Previous image (left)
-                    if currentIndex > 0, let imageUrlString = images[safe: currentIndex - 1],
-                       let url = URL(string: imageUrlString) {
-                        ZStack {
-                            if let image = preloader.loadedImages[url] {
-                                ZoomableDismissableImageView(
-                                    image: image,
-                                    geometry: geometry,
-                                    onFlickDismiss: onDismiss,
-                                    onZoomChanged: { isZoomed in
-                                        isImageZoomed = isZoomed
+                    ForEach(max(0, currentIndex - 1)...min(mediaItems.count - 1, currentIndex + 1), id: \.self) { index in
+                        if let mediaItem = mediaItems[safe: index] {
+                            ZStack {
+                                if mediaItem.type.isVideo {
+                                    // Show YouTube player for videos
+                                    if case .youtubeVideo(let embedURL) = mediaItem.type {
+                                        YouTubePlayerView(embedURL: embedURL, autoplay: index == currentIndex)
+                                            .frame(width: geometry.size.width, height: geometry.size.height * 0.6)
+                                            .background(Color.black)
                                     }
-                                )
-                            } else if preloader.loading.contains(url) {
-                                ProgressView()
-                                    .tint(.white)
-                                    .scaleEffect(1.5)
-                            } else {
-                                // Placeholder for failed images
-                                Color.black.opacity(0.3)
-                            }
-                        }
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .offset(x: -(geometry.size.width + imageSpacing) + offset)
-                        .id("prev-\(currentIndex)")
-                    }
-                    
-                    // Current image (center)
-                    if let imageUrlString = images[safe: currentIndex],
-                       let url = URL(string: imageUrlString) {
-                        ZStack {
-                            if let image = preloader.loadedImages[url] {
-                                ZoomableDismissableImageView(
-                                    image: image,
-                                    geometry: geometry,
-                                    onFlickDismiss: onDismiss,
-                                    onZoomChanged: { isZoomed in
-                                        isImageZoomed = isZoomed
-                                    }
-                                )
-                            } else if preloader.loading.contains(url) || retryingURLs.contains(url) {
-                                ProgressView()
-                                    .tint(.white)
-                                    .scaleEffect(1.5)
-                            } else {
-                                VStack(spacing: 16) {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.white.opacity(0.7))
-                                    Text("Image failed to load")
-                                        .foregroundColor(.white.opacity(0.7))
-                                    Button(action: {
-                                        #if os(iOS)
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        #endif
-                                        retryingURLs.insert(url)
-                                        preloader.retryImage(for: url)
-                                        // Remove from retrying set after a delay to allow preloader.loading to take over
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                            retryingURLs.remove(url)
-                                        }
-                                    }) {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "arrow.clockwise")
-                                            Text("Retry")
-                                        }
-                                        .padding(.horizontal, 20)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            Capsule()
-                                                .fill(Color.accentColor.opacity(0.2))
+                                } else if let url = URL(string: mediaItem.url) {
+                                    // Show image viewer for images
+                                    if let image = preloader.loadedImages[url] {
+                                        ZoomableDismissableImageView(
+                                            image: image,
+                                            geometry: geometry,
+                                            onFlickDismiss: onDismiss,
+                                            onZoomChanged: { isZoomed in
+                                                isImageZoomed = isZoomed
+                                            }
                                         )
-                                        .foregroundColor(.accentColor)
+                                    } else if preloader.loading.contains(url) || retryingURLs.contains(url) {
+                                        ProgressView()
+                                            .tint(.white)
+                                            .scaleEffect(1.5)
+                                    } else if index == currentIndex {
+                                        // Only show retry button for current image
+                                        VStack(spacing: 16) {
+                                            Image(systemName: "exclamationmark.triangle")
+                                                .font(.system(size: 40))
+                                                .foregroundColor(.white.opacity(0.7))
+                                            Text("Image failed to load")
+                                                .foregroundColor(.white.opacity(0.7))
+                                            Button(action: {
+                                                #if os(iOS)
+                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                #endif
+                                                retryingURLs.insert(url)
+                                                preloader.retryImage(for: url)
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                                    retryingURLs.remove(url)
+                                                }
+                                            }) {
+                                                HStack(spacing: 8) {
+                                                    Image(systemName: "arrow.clockwise")
+                                                    Text("Retry")
+                                                }
+                                                .padding(.horizontal, 20)
+                                                .padding(.vertical, 10)
+                                                .background(
+                                                    Capsule()
+                                                        .fill(Color.accentColor.opacity(0.2))
+                                                )
+                                                .foregroundColor(.accentColor)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                        .allowsHitTesting(true)
+                                    } else {
+                                        // Placeholder for failed images
+                                        Color.black.opacity(0.3)
                                     }
-                                    .buttonStyle(.plain)
                                 }
-                                .allowsHitTesting(true)
                             }
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .offset(x: CGFloat(index - currentIndex) * (geometry.size.width + imageSpacing) + offset)
+                            .id("media-\(index)")
                         }
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .offset(x: offset)
-                        .id("current-\(currentIndex)")
-                    }
-                    
-                    // Next image (right)
-                    if currentIndex < images.count - 1, let imageUrlString = images[safe: currentIndex + 1],
-                       let url = URL(string: imageUrlString) {
-                        ZStack {
-                            if let image = preloader.loadedImages[url] {
-                                ZoomableDismissableImageView(
-                                    image: image,
-                                    geometry: geometry,
-                                    onFlickDismiss: onDismiss,
-                                    onZoomChanged: { isZoomed in
-                                        isImageZoomed = isZoomed
-                                    }
-                                )
-                            } else if preloader.loading.contains(url) {
-                                ProgressView()
-                                    .tint(.white)
-                                    .scaleEffect(1.5)
-                            } else {
-                                // Placeholder for failed images
-                                Color.black.opacity(0.3)
-                            }
-                        }
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .offset(x: (geometry.size.width + imageSpacing) + offset)
-                        .id("next-\(currentIndex)")
                     }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
@@ -223,7 +182,7 @@ struct FullScreenImageGalleryView: View {
                                 dismissProgress = 0
                                 
                                 // Add edge resistance (rubberband effect)
-                                if (currentIndex == 0 && translation.width > 0) || (currentIndex == images.count - 1 && translation.width < 0) {
+                                if (currentIndex == 0 && translation.width > 0) || (currentIndex == mediaItems.count - 1 && translation.width < 0) {
                                     offset = translation.width * 0.3
                                 } else {
                                     offset = translation.width
@@ -281,26 +240,26 @@ struct FullScreenImageGalleryView: View {
                                 dismissProgress = 0
                                 
                                 let velocity = value.predictedEndTranslation.width - value.translation.width
-                                let threshold: CGFloat = geometry.size.width * 0.15
-                                let velocityThreshold: CGFloat = 500
+                                let threshold: CGFloat = geometry.size.width * 0.2  // Slightly higher for more intentional swipes
+                                let velocityThreshold: CGFloat = 300  // Lower threshold for quicker response to fast swipes
                                 
                                 let shouldGoBack = (translation.width > threshold || velocity > velocityThreshold) && currentIndex > 0
-                                let shouldGoForward = (translation.width < -threshold || velocity < -velocityThreshold) && currentIndex < images.count - 1
+                                let shouldGoForward = (translation.width < -threshold || velocity < -velocityThreshold) && currentIndex < mediaItems.count - 1
                                 
                                 if shouldGoBack {
                                     #if os(iOS)
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     #endif
                                     
-                                    // First complete the slide animation to the right
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85, blendDuration: 0)) {
-                                        offset = geometry.size.width + imageSpacing
-                                        verticalOffset = 0
-                                        dismissProgress = 0
+                                    // Animate slide to completion FIRST, then update index
+                                    // This creates a seamless canvas effect
+                                    let screenWidth = geometry.size.width
+                                    withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                                        offset = screenWidth  // Complete the slide to the right
                                     }
                                     
                                     // After animation completes, update index and reset offset
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                                         currentIndex -= 1
                                         offset = 0
                                     }
@@ -310,22 +269,21 @@ struct FullScreenImageGalleryView: View {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     #endif
                                     
-                                    // First complete the slide animation to the left
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85, blendDuration: 0)) {
-                                        offset = -(geometry.size.width + imageSpacing)
-                                        verticalOffset = 0
-                                        dismissProgress = 0
+                                    // Animate slide to completion FIRST, then update index
+                                    let screenWidth = geometry.size.width
+                                    withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                                        offset = -screenWidth  // Complete the slide to the left
                                     }
                                     
                                     // After animation completes, update index and reset offset
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                                         currentIndex += 1
                                         offset = 0
                                     }
                                     resetControlsTimer()
                                 } else {
-                                    // Snap back smoothly with spring physics
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.88)) {
+                                    // Snap back smoothly with slightly bouncier spring physics
+                                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                                         offset = 0
                                         verticalOffset = 0
                                         dismissProgress = 0
@@ -343,11 +301,11 @@ struct FullScreenImageGalleryView: View {
                 )
                 
                 // Page indicator (with blur)
-                if images.count > 1 {
+                if mediaItems.count > 1 {
                     VStack {
                         Spacer()
                         HStack(spacing: 6) {
-                            ForEach(0..<images.count, id: \.self) { index in
+                            ForEach(0..<mediaItems.count, id: \.self) { index in
                                 Button(action: {
                                     // Don't navigate if already on this image or if zoomed
                                     guard index != currentIndex && !isImageZoomed else { return }
@@ -356,15 +314,17 @@ struct FullScreenImageGalleryView: View {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     #endif
                                     
+                                    // Calculate direction and distance
                                     let direction = index > currentIndex ? -1 : 1
+                                    let distance = abs(index - currentIndex)
                                     
-                                    // Animate to the new image
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85, blendDuration: 0)) {
-                                        offset = CGFloat(direction) * (geometry.size.width + imageSpacing)
+                                    // Animate slide in the appropriate direction
+                                    withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                                        offset = CGFloat(direction) * geometry.size.width * CGFloat(distance)
                                     }
                                     
-                                    // Update index after animation
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                    // After animation completes, update index and reset offset
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                                         currentIndex = index
                                         offset = 0
                                     }
@@ -423,7 +383,7 @@ struct FullScreenImageGalleryView: View {
                 
                 // Counter (with blur)
                 VStack {
-                    Text("\(currentIndex + 1) of \(images.count)")
+                    Text("\(currentIndex + 1) of \(mediaItems.count)")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
@@ -443,8 +403,8 @@ struct FullScreenImageGalleryView: View {
         }
         .statusBar(hidden: true)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Image \(currentIndex + 1) of \(images.count)")
-        .accessibilityHint("Swipe left or right to navigate between images. Tap to toggle controls.")
+        .accessibilityLabel("Media \(currentIndex + 1) of \(mediaItems.count)")
+        .accessibilityHint("Swipe left or right to navigate between items. Tap to toggle controls.")
         .onAppear {
             resetControlsTimer()
         }

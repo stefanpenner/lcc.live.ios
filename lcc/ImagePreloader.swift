@@ -31,6 +31,20 @@ class ImagePreloader: ObservableObject {
             self.lastRefreshed = Date()
         }
     }
+    
+    /// Preload media items (only loads images, skips videos)
+    func preloadMedia(from mediaItems: [MediaItem]) {
+        let urls = mediaItems
+            .filter { !$0.type.isVideo } // Only preload images
+            .compactMap { URL(string: $0.url) }
+        self.urls = urls
+        for url in urls {
+            loadImage(for: url)
+        }
+        DispatchQueue.main.async {
+            self.lastRefreshed = Date()
+        }
+    }
 
     func refreshImages() {
         for url in urls {
