@@ -185,24 +185,22 @@ struct MainView: View {
             
             // Top gradient overlay (at the very top, Photos app style)
             if fullScreenMedia == nil {
-                VStack(spacing: 0) {
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color(.systemBackground).opacity(0.95),
-                            Color(.systemBackground).opacity(0.7),
-                            Color(.systemBackground).opacity(0.0),
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 80)
-                    Spacer()
-                }
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(.systemBackground).opacity(0.95),
+                        Color(.systemBackground).opacity(0.7),
+                        Color(.systemBackground).opacity(0.0),
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(width: geometry.size.width, height: 80)
+                .position(x: geometry.size.width / 2, y: 40)
                 .ignoresSafeArea(edges: .top)
-                .zIndex(1.5)
                 .opacity(showUIControls ? 1 : 0)
                 .animation(.easeOut(duration: 0.3), value: showUIControls)
                 .allowsHitTesting(false) // Don't intercept touches - let them pass through to buttons
+                .zIndex(1.5)
             }
             
             // Overlay the fullscreen media if needed
@@ -222,34 +220,32 @@ struct MainView: View {
                         }
                     }
                 )
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                 .id(overlayUUID)
                 .transition(.opacity)
                 .zIndex(3)
             } else {
                 // Bottom floating GridModeToggle
-                VStack {
-                    Spacer()
-                    GridModeToggle(
-                        gridMode: $gridMode,
-                    )
-                    .padding(.bottom, 8)
-                    .opacity(showUIControls ? 1 : 0)
-                    .animation(.easeOut(duration: 0.3), value: showUIControls)
-                }
+                GridModeToggle(
+                    gridMode: $gridMode,
+                )
+                .frame(width: geometry.size.width)
+                .position(x: geometry.size.width / 2, y: geometry.size.height - 50)
+                .opacity(showUIControls ? 1 : 0)
+                .animation(.easeOut(duration: 0.3), value: showUIControls)
                 .zIndex(2)
                 
                 // Invisible tap area at top to show controls when hidden
                 if !showUIControls {
-                    VStack {
-                        Color.clear
-                            .frame(height: 100)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                resetUIControlsTimer()
-                            }
-                        Spacer()
-                    }
-                    .zIndex(2.5)
+                    Color.clear
+                        .frame(width: geometry.size.width, height: 100)
+                        .contentShape(Rectangle())
+                        .position(x: geometry.size.width / 2, y: 50)
+                        .onTapGesture {
+                            resetUIControlsTimer()
+                        }
+                        .zIndex(2.5)
                 }
             }
             }
