@@ -4,6 +4,7 @@ struct FullScreenImageGalleryView: View {
     let mediaItems: [MediaItem]
     let initialMediaItem: MediaItem
     let onDismiss: () -> Void
+    let onTabChange: ((Int) -> Void)?
     
     @EnvironmentObject var preloader: ImagePreloader
     @State private var currentIndex: Int = 0
@@ -33,10 +34,11 @@ struct FullScreenImageGalleryView: View {
     // Spacing between images - set to 0 for seamless canvas feel
     private let imageSpacing: CGFloat = 0
     
-    init(mediaItems: [MediaItem], initialMediaItem: MediaItem, onDismiss: @escaping () -> Void) {
+    init(mediaItems: [MediaItem], initialMediaItem: MediaItem, onDismiss: @escaping () -> Void, onTabChange: ((Int) -> Void)? = nil) {
         self.mediaItems = mediaItems
         self.initialMediaItem = initialMediaItem
         self.onDismiss = onDismiss
+        self.onTabChange = onTabChange
         
         // Find the initial index
         if let index = mediaItems.firstIndex(where: { $0.id == initialMediaItem.id }) {
@@ -58,10 +60,10 @@ struct FullScreenImageGalleryView: View {
                         if let mediaItem = mediaItems[safe: index] {
                             ZStack {
                                 if mediaItem.type.isVideo {
-                                    // Show YouTube player for videos
+                                    // Show YouTube player for videos (full screen)
                                     if case .youtubeVideo(let embedURL) = mediaItem.type {
                                         YouTubePlayerView(embedURL: embedURL, autoplay: index == currentIndex)
-                                            .frame(width: geometry.size.width, height: geometry.size.height * 0.6)
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                                             .background(Color.black)
                                     }
                                 } else if let url = URL(string: mediaItem.url) {
@@ -405,6 +407,38 @@ struct FullScreenImageGalleryView: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Media \(currentIndex + 1) of \(mediaItems.count)")
         .accessibilityHint("Swipe left or right to navigate between items. Tap to toggle controls.")
+        .gesture(
+            DragGesture(minimumDistance: 40)
+                .onEnded { value in
+                    // Only handle horizontal swipes when not zoomed and not dismissing
+                    guard !isImageZoomed && !isDismissing else { return }
+                    
+                    let isHorizontalSwipe = abs(value.translation.width) > abs(value.translation.height) * 2
+                    guard isHorizontalSwipe else { return }
+                    
+                    let velocity = value.predictedEndTranslation.width - value.translation.width
+                    let threshold: CGFloat = 120
+                    
+                    #if DEBUG
+                    print("🖼️ FullScreen: Tab swipe detected - translation: \(value.translation), velocity: \(velocity)")
+                    #endif
+                    
+                    // Swipe left - go to next tab (BCC)
+                    if (value.translation.width < -threshold || velocity < -500) {
+                        #if DEBUG
+                        print("🖼️ FullScreen: Switching to BCC")
+                        #endif
+                        onTabChange?(1)
+                    }
+                    // Swipe right - go to previous tab (LCC)
+                    else if (value.translation.width > threshold || velocity > 500) {
+                        #if DEBUG
+                        print("🖼️ FullScreen: Switching to LCC")
+                        #endif
+                        onTabChange?(0)
+                    }
+                }
+        )
         .onAppear {
             resetControlsTimer()
         }

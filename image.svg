@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a2332;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f1820;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Red dot glow -->
+    <radialGradient id="redGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ff4444;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ff3333;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#cc0000;stop-opacity:0.6" />
+    </radialGradient>
+    
+    <!-- Mountain gradients -->
+    <linearGradient id="mountainLight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0f4f8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d8e4f0;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="mountainMid" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#c8d8e8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8fa8c0;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="mountainDark" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#6b8099;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4a5d70;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Rounded square background -->
+  <rect width="1024" height="1024" rx="225" ry="225" fill="url(#bgGradient)"/>
+  
+  <!-- Red indicator dot with glow -->
+  <circle cx="240" cy="240" r="45" fill="url(#redGlow)" opacity="0.3"/>
+  <circle cx="240" cy="240" r="32" fill="#ff3333"/>
+  
+  <!-- Stars (small sparkles) -->
+  <!-- Upper right area -->
+  <path d="M 380 200 L 385 205 L 380 210 L 375 205 Z" fill="white" opacity="0.9"/>
+  <path d="M 600 220 L 605 225 L 600 230 L 595 225 Z" fill="white" opacity="0.8"/>
+  <path d="M 790 210 L 796 216 L 790 222 L 784 216 Z" fill="white" opacity="0.85"/>
+  
+  <!-- Middle area -->
+  <path d="M 190 450 L 195 455 L 190 460 L 185 455 Z" fill="white" opacity="0.7"/>
+  <path d="M 330 520 L 336 526 L 330 532 L 324 526 Z" fill="white" opacity="0.75"/>
+  <path d="M 435 640 L 440 645 L 435 650 L 430 645 Z" fill="white" opacity="0.65"/>
+  
+  <!-- Lower right area -->
+  <path d="M 720 520 L 726 526 L 720 532 L 714 526 Z" fill="white" opacity="0.8"/>
+  <path d="M 840 480 L 846 486 L 840 492 L 834 486 Z" fill="white" opacity="0.75"/>
+  <path d="M 838 700 L 843 705 L 838 710 L 833 705 Z" fill="white" opacity="0.7"/>
+  
+  <!-- Mountains -->
+  <!-- Back mountain (right, darker) -->
+  <path d="M 400 950 L 560 600 L 650 700 L 750 950 Z" 
+        fill="url(#mountainDark)" opacity="0.6"/>
+  
+  <!-- Middle mountain (center-right) -->
+  <path d="M 450 950 L 580 550 L 700 750 L 850 950 Z" 
+        fill="url(#mountainMid)"/>
+  
+  <!-- Front mountain (left, lightest) -->
+  <path d="M 150 950 L 350 650 L 420 720 L 500 950 Z" 
+        fill="url(#mountainLight)"/>
+  
+  <!-- Mountain shadow details -->
+  <path d="M 350 650 L 380 700 L 360 750 L 340 720 Z" 
+        fill="#8fa8c0" opacity="0.4"/>
+  <path d="M 580 550 L 620 650 L 600 700 L 570 620 Z" 
+        fill="#6b8099" opacity="0.3"/>
+  
+  <!-- Text "lcc.live" -->
+  <text x="512" y="400" 
+        font-family="Arial, Helvetica, sans-serif" 
+        font-size="140" 
+        font-weight="700" 
+        fill="white" 
+        text-anchor="middle"
+        letter-spacing="-2">lcc.live</text>
+</svg>

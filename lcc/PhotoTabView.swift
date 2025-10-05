@@ -13,8 +13,6 @@ struct PhotoTabView: View {
 
     @Environment(\.colorScheme) var colorScheme
     @State private var isRefreshing = false
-    @State private var scrollOffset: CGFloat = 0
-    @State private var lastScrollOffset: CGFloat = 0
     
     enum ScrollDirection {
         case up
@@ -39,61 +37,77 @@ struct PhotoTabView: View {
             let imageHeight = imageWidth * (gridMode == .single ? 0.9 : 0.9)
             let gridItems = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: columns)
             
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Pull-to-refresh area
-                    Color.clear
-                        .frame(height: 60)
-                    
-                    if mediaItems.isEmpty {
-                        EmptyStateView()
-                            .frame(width: availableWidth, height: geometry.size.height * 0.6)
-                    } else {
-                        LazyVGrid(columns: gridItems, spacing: spacing) {
-                            ForEach(mediaItems, id: \.id) { mediaItem in
-                                MediaCell(
-                                    mediaItem: mediaItem,
-                                    imageWidth: imageWidth,
-                                    imageHeight: imageHeight,
-                                    colorScheme: colorScheme,
-                                    onTap: {
-                                        onRequestFullScreen(PresentedMedia(mediaItem: mediaItem))
-                                    },
-                                    onRetry: {
-                                        if !mediaItem.type.isVideo, let url = URL(string: mediaItem.url) {
-                                            preloader.retryImage(for: url)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Pull-to-refresh area
+                        Color.clear
+                            .frame(height: 60)
+                            .id("top")
+                        
+                        if mediaItems.isEmpty {
+                            EmptyStateView()
+                                .frame(width: availableWidth, height: geometry.size.height * 0.6)
+                        } else {
+                            LazyVGrid(columns: gridItems, spacing: spacing) {
+                                ForEach(mediaItems, id: \.id) { mediaItem in
+                                    MediaCell(
+                                        mediaItem: mediaItem,
+                                        imageWidth: imageWidth,
+                                        imageHeight: imageHeight,
+                                        colorScheme: colorScheme,
+                                        onTap: {
+                                            onRequestFullScreen(PresentedMedia(mediaItem: mediaItem))
+                                        },
+                                        onRetry: {
+                                            if !mediaItem.type.isVideo, let url = URL(string: mediaItem.url) {
+                                                preloader.retryImage(for: url)
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        
+                        // Bottom spacer to ensure we can scroll
+                        Color.clear
+                            .frame(height: 100)
+                            .id("bottom")
+                    }
+                }
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 20)
+                        .onChanged { value in
+                            // Only process vertical scrolling gestures
+                            let isVerticalSwipe = abs(value.translation.height) > abs(value.translation.width) * 1.5
+                            
+                            guard isVerticalSwipe else { return }
+                            
+                            let delta = value.translation.height
+                            
+                            // Only process if we have enough movement
+                            guard abs(delta) > 20 else { return }
+                            
+                            #if DEBUG
+                            print("📜 PhotoTabView: Vertical scroll detected, translation: \(value.translation)")
+                            #endif
+                            
+                            if delta < -30 {
+                                // Scrolling down (content moving up) - hide controls
+                                #if DEBUG
+                                print("📜 PhotoTabView: Scroll DOWN - hiding controls")
+                                #endif
+                                onScrollDirectionChanged?(.down)
+                            } else if delta > 30 {
+                                // Scrolling up (content moving down) - show controls
+                                #if DEBUG
+                                print("📜 PhotoTabView: Scroll UP - showing controls")
+                                #endif
+                                onScrollDirectionChanged?(.up)
                             }
                         }
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            GeometryReader { scrollGeo in
-                                Color.clear
-                                    .preference(key: ScrollOffsetPreferenceKey.self, value: scrollGeo.frame(in: .named("scroll")).minY)
-                            }
-                        )
-                    }
-                }
-            }
-            .coordinateSpace(name: "scroll")
-            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                let delta = value - lastScrollOffset
-                
-                // Detect scroll direction with threshold to avoid jitter
-                // More responsive thresholds for better UX
-                if abs(delta) > 5 {
-                    if delta < -30 {
-                        // Scrolling down (content moving up) - hide controls
-                        onScrollDirectionChanged?(.down)
-                        lastScrollOffset = value
-                    } else if delta > 30 {
-                        // Scrolling up (content moving down) - show controls
-                        onScrollDirectionChanged?(.up)
-                        lastScrollOffset = value
-                    }
-                }
+                )
             }
             .refreshable {
                 await performRefresh()

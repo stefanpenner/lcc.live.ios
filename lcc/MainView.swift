@@ -13,6 +13,10 @@ struct MainView: View {
     @State private var gridMode: PhotoTabView.GridMode = .single
     let tabBarHeight: CGFloat = 36
     
+    // Horizontal scroll state
+    @State private var scrollOffset: CGFloat = 0
+    @State private var dragOffset: CGFloat = 0
+    
     private var isLandscape: Bool {
         verticalSizeClass == .compact
     }
@@ -72,20 +76,28 @@ struct MainView: View {
     }
     
     private func handleScrollDirection(_ direction: PhotoTabView.ScrollDirection) {
-        uiControlsTimer?.invalidate()
+        #if DEBUG
+        print("📱 MainView: handleScrollDirection called with: \(direction)")
+        #endif
         
-        withAnimation(.easeOut(duration: 0.3)) {
-            switch direction {
-            case .down:
-                // Scrolling down - hide controls
+        switch direction {
+        case .down:
+            // Scrolling down - hide controls immediately
+            #if DEBUG
+            print("📱 MainView: Hiding controls")
+            #endif
+            uiControlsTimer?.invalidate()
+            withAnimation(.easeOut(duration: 0.3)) {
                 showUIControls = false
-            case .up:
-                // Scrolling up - show controls and start auto-hide timer
-                showUIControls = true
-                resetUIControlsTimer()
-            case .idle:
-                break
             }
+        case .up:
+            // Scrolling up - show controls and start auto-hide timer
+            #if DEBUG
+            print("📱 MainView: Showing controls")
+            #endif
+            resetUIControlsTimer()
+        case .idle:
+            break
         }
     }
     
@@ -102,27 +114,74 @@ struct MainView: View {
     }
     
     var body: some View {
-        ZStack {
-            // Use a simple conditional view instead of TabView to avoid gesture conflicts
-            Group {
-                if selectedTab == 0 {
+        GeometryReader { geometry in
+            ZStack {
+                // Horizontal scrollable canvas with both tabs side by side
+                HStack(spacing: 0) {
                     lccPhotoTab
-                        .transition(.opacity)
-                } else {
+                        .frame(width: geometry.size.width)
+                    
                     bccPhotoTab
-                        .transition(.opacity)
+                        .frame(width: geometry.size.width)
                 }
-            }
-            .animation(.easeInOut(duration: 0.2), value: selectedTab)
-            .allowsHitTesting(!isAnyFullScreen)
-            .ignoresSafeArea(edges: [.top, .bottom])
-            .onChange(of: selectedTab) {
+                .offset(x: -CGFloat(selectedTab) * geometry.size.width + dragOffset)
+                .allowsHitTesting(!isAnyFullScreen)
+                .ignoresSafeArea(edges: [.top, .bottom])
+                .gesture(
+                    DragGesture(minimumDistance: 10)
+                        .onChanged { value in
+                            // Only allow horizontal dragging when not in fullscreen
+                            guard fullScreenMedia == nil else { return }
+                            
+                            let translation = value.translation.width
+                            let verticalTranslation = abs(value.translation.height)
+                            
+                            // Only respond to primarily horizontal gestures
+                            guard abs(translation) > verticalTranslation * 1.5 else { return }
+                            
+                            // Add resistance at edges
+                            if (selectedTab == 0 && translation > 0) || (selectedTab == 1 && translation < 0) {
+                                dragOffset = translation * 0.2 // Reduced movement at edges
+                            } else {
+                                dragOffset = translation
+                            }
+                        }
+                        .onEnded { value in
+                            guard fullScreenMedia == nil else { return }
+                            
+                            let translation = value.translation.width
+                            let velocity = value.predictedEndTranslation.width - value.translation.width
+                            let threshold: CGFloat = geometry.size.width * 0.25
+                            let velocityThreshold: CGFloat = 400
+                            
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                if translation < -threshold || velocity < -velocityThreshold {
+                                    // Swipe to BCC (right tab)
+                                    if selectedTab == 0 {
+                                        selectedTab = 1
 #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
 #endif
-                // Show controls when switching tabs
-                resetUIControlsTimer()
-            }
+                                    }
+                                } else if translation > threshold || velocity > velocityThreshold {
+                                    // Swipe to LCC (left tab)
+                                    if selectedTab == 1 {
+                                        selectedTab = 0
+#if os(iOS)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+#endif
+                                    }
+                                }
+                                
+                                // Reset drag offset
+                                dragOffset = 0
+                            }
+                        }
+                )
+                .onChange(of: selectedTab) {
+                    // Show controls when switching tabs
+                    resetUIControlsTimer()
+                }
             
             // Top gradient overlay (at the very top, Photos app style)
             if fullScreenMedia == nil {
@@ -153,6 +212,14 @@ struct MainView: View {
                     initialMediaItem: presented.mediaItem,
                     onDismiss: {
                         withAnimation { fullScreenMedia = nil }
+                    },
+                    onTabChange: { newTab in
+                        #if DEBUG
+                        print("🔄 MainView: Tab change from fullscreen: \(newTab)")
+                        #endif
+                        withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                            selectedTab = newTab
+                        }
                     }
                 )
                 .id(overlayUUID)
@@ -170,6 +237,21 @@ struct MainView: View {
                     .animation(.easeOut(duration: 0.3), value: showUIControls)
                 }
                 .zIndex(2)
+                
+                // Invisible tap area at top to show controls when hidden
+                if !showUIControls {
+                    VStack {
+                        Color.clear
+                            .frame(height: 100)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                resetUIControlsTimer()
+                            }
+                        Spacer()
+                    }
+                    .zIndex(2.5)
+                }
+            }
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
