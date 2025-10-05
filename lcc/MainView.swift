@@ -55,40 +55,73 @@ struct MainView: View {
     }
     
     private func resetUIControlsTimer() {
-        // Show controls when any scroll activity detected
+        // Cancel any existing timer
+        uiControlsTimer?.invalidate()
+        
+        // Show controls
         withAnimation(.easeOut(duration: 0.3)) {
             showUIControls = true
+        }
+        
+        // Auto-hide after 3 seconds of no activity
+        uiControlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+            withAnimation(.easeOut(duration: 0.3)) {
+                showUIControls = false
+            }
         }
     }
     
     private func handleScrollDirection(_ direction: PhotoTabView.ScrollDirection) {
+        uiControlsTimer?.invalidate()
+        
         withAnimation(.easeOut(duration: 0.3)) {
             switch direction {
             case .down:
                 // Scrolling down - hide controls
                 showUIControls = false
             case .up:
-                // Scrolling up - show controls
+                // Scrolling up - show controls and start auto-hide timer
                 showUIControls = true
+                resetUIControlsTimer()
             case .idle:
                 break
             }
         }
     }
     
+    private func toggleUIControls() {
+        uiControlsTimer?.invalidate()
+        
+        withAnimation(.easeOut(duration: 0.3)) {
+            showUIControls.toggle()
+        }
+        
+        if showUIControls {
+            resetUIControlsTimer()
+        }
+    }
+    
     var body: some View {
         ZStack {
-            TabView(selection: $selectedTab) {
-                lccPhotoTab
-                bccPhotoTab
+            // Use a simple conditional view instead of TabView to avoid gesture conflicts
+            Group {
+                if selectedTab == 0 {
+                    lccPhotoTab
+                        .transition(.opacity)
+                } else {
+                    bccPhotoTab
+                        .transition(.opacity)
+                }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            .animation(.easeInOut(duration: 0.2), value: selectedTab)
             .allowsHitTesting(!isAnyFullScreen)
             .ignoresSafeArea(edges: [.top, .bottom])
             .onChange(of: selectedTab) {
 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
 #endif
+                // Show controls when switching tabs
+                resetUIControlsTimer()
             }
             
             // Top gradient overlay (at the very top, Photos app style)
@@ -164,6 +197,14 @@ struct MainView: View {
         }
         .onChange(of: fullScreenMedia) { _, newValue in
             isAnyFullScreen = newValue != nil
+        }
+        .onAppear {
+            // Show controls on initial load with auto-hide
+            resetUIControlsTimer()
+        }
+        .onDisappear {
+            // Clean up timer
+            uiControlsTimer?.invalidate()
         }
     }
 }

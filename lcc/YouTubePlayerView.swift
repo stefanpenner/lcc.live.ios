@@ -30,7 +30,7 @@ struct YouTubePlayerView: UIViewRepresentable {
         
         // Add autoplay parameter if needed
         if autoplay {
-            urlString += embedURL.contains("?") ? "&autoplay=1" : "?autoplay=1"
+            urlString += embedURL.contains("?") ? "&autoplay=1&mute=1" : "?autoplay=1&mute=1"
         }
         
         // Add other useful parameters
@@ -39,17 +39,60 @@ struct YouTubePlayerView: UIViewRepresentable {
             "rel=0",                    // Don't show related videos
             "modestbranding=1",         // Minimal YouTube branding
             "controls=1",               // Show player controls
-            "showinfo=0"                // Hide video info
+            "showinfo=0",               // Hide video info
+            "enablejsapi=1"             // Enable JavaScript API
         ]
         
         for param in params {
             urlString += urlString.contains("?") ? "&\(param)" : "?\(param)"
         }
         
-        if let url = URL(string: urlString) {
-            let request = URLRequest(url: url)
-            webView.load(request)
-        }
+        // Wrap in proper HTML with responsive iframe
+        let html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    border: 0;
+                }
+                html, body {
+                    width: 100%;
+                    height: 100%;
+                    background-color: #000;
+                    overflow: hidden;
+                }
+                .video-container {
+                    position: relative;
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                iframe {
+                    width: 100%;
+                    height: 100%;
+                    border: none;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="video-container">
+                <iframe src="\(urlString)" 
+                        frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                        allowfullscreen>
+                </iframe>
+            </div>
+        </body>
+        </html>
+        """
+        
+        webView.loadHTMLString(html, baseURL: URL(string: "https://www.youtube.com"))
     }
 }
 

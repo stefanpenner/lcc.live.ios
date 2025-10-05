@@ -82,17 +82,17 @@ struct PhotoTabView: View {
                 let delta = value - lastScrollOffset
                 
                 // Detect scroll direction with threshold to avoid jitter
-                if abs(delta) > 10 {
-                    if delta < -50 {
-                        // Scrolling down (content moving up)
+                // More responsive thresholds for better UX
+                if abs(delta) > 5 {
+                    if delta < -30 {
+                        // Scrolling down (content moving up) - hide controls
                         onScrollDirectionChanged?(.down)
-                    } else if delta > 50 {
-                        // Scrolling up (content moving down)
+                        lastScrollOffset = value
+                    } else if delta > 30 {
+                        // Scrolling up (content moving down) - show controls
                         onScrollDirectionChanged?(.up)
+                        lastScrollOffset = value
                     }
-                    
-                    onScrollActivity?()
-                    lastScrollOffset = value
                 }
             }
             .refreshable {
