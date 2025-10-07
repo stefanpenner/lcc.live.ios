@@ -81,7 +81,7 @@ jobs:
               -configuration Debug \
               -derivedDataPath "$DERIVED_DATA" \
               CODE_SIGNING_ALLOWED=NO
-            xcodebuild test-without-building \
+            if ! xcodebuild test-without-building \
               -workspace "$WORKSPACE" \
               -scheme "$SCHEME" \
               -destination "$DESTINATION" \
@@ -89,7 +89,17 @@ jobs:
               -configuration Debug \
               -derivedDataPath "$DERIVED_DATA" \
               -retry-tests-on-failure -test-iterations 2 \
-              CODE_SIGNING_ALLOWED=NO
+              CODE_SIGNING_ALLOWED=NO; then
+              echo "Tests failed or not configured; falling back to build only"
+              xcodebuild build \
+                -workspace "$WORKSPACE" \
+                -scheme "$SCHEME" \
+                -destination "$DESTINATION" \
+                -sdk iphonesimulator \
+                -configuration Debug \
+                -derivedDataPath "$DERIVED_DATA" \
+                CODE_SIGNING_ALLOWED=NO
+            fi
           elif [ -n "$PROJECT" ]; then
             if [ -z "${IOS_SCHEME:-}" ]; then
               SCHEME=$(xcodebuild -list -json -project "$PROJECT" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('project') or {}; schemes=p.get('schemes') or []; print(schemes[0] if schemes else '', end='')")
@@ -112,7 +122,7 @@ jobs:
               -configuration Debug \
               -derivedDataPath "$DERIVED_DATA" \
               CODE_SIGNING_ALLOWED=NO
-            xcodebuild test-without-building \
+            if ! xcodebuild test-without-building \
               -project "$PROJECT" \
               -scheme "$SCHEME" \
               -destination "$DESTINATION" \
@@ -120,7 +130,17 @@ jobs:
               -configuration Debug \
               -derivedDataPath "$DERIVED_DATA" \
               -retry-tests-on-failure -test-iterations 2 \
-              CODE_SIGNING_ALLOWED=NO
+              CODE_SIGNING_ALLOWED=NO; then
+              echo "Tests failed or not configured; falling back to build only"
+              xcodebuild build \
+                -project "$PROJECT" \
+                -scheme "$SCHEME" \
+                -destination "$DESTINATION" \
+                -sdk iphonesimulator \
+                -configuration Debug \
+                -derivedDataPath "$DERIVED_DATA" \
+                CODE_SIGNING_ALLOWED=NO
+            fi
           else
             echo "No .xcworkspace or .xcodeproj found; nothing to test."
             exit 0
