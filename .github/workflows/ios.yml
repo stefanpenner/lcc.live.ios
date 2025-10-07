@@ -1,14 +1,71 @@
-name: CI
+name: iOS CI
 
 on: [push, pull_request]
 
 jobs:
-  check:
-    name: Basic CI
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  ios-tests:
+    name: Build and Test (iOS Simulator)
+    runs-on: macos-14
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Verify
-        run: echo "CI is green"
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+
+      - name: Build and Test (auto-detect project/workspace)
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+
+          # Choose a widely available simulator destination
+          DESTINATION="platform=iOS Simulator,name=iPhone 15,OS=latest"
+
+          workspaces=(**/*.xcworkspace)
+          projects=(**/*.xcodeproj)
+
+          if [ ${#workspaces[@]} -gt 0 ]; then
+            WORKSPACE="${workspaces[0]}"
+            if [ -z "${IOS_SCHEME:-}" ]; then
+              SCHEME=$(xcodebuild -list -json -workspace "$WORKSPACE" | python3 -c 'import sys,json; d=json.load(sys.stdin); w=d.get("workspace") or d.get("project"); print(w["schemes"][0])')
+            else
+              SCHEME="$IOS_SCHEME"
+            fi
+            echo "Using workspace: $WORKSPACE"
+            echo "Using scheme: $SCHEME"
+            xcodebuild clean test \
+              -workspace "$WORKSPACE" \
+              -scheme "$SCHEME" \
+              -destination "$DESTINATION" \
+              CODE_SIGNING_ALLOWED=NO
+          elif [ ${#projects[@]} -gt 0 ]; then
+            PROJECT="${projects[0]}"
+            if [ -z "${IOS_SCHEME:-}" ]; then
+              SCHEME=$(xcodebuild -list -json -project "$PROJECT" | python3 -c 'import sys,json; print(json.load(sys.stdin)["project"]["schemes"][0])')
+            else
+              SCHEME="$IOS_SCHEME"
+            fi
+            echo "Using project: $PROJECT"
+            echo "Using scheme: $SCHEME"
+            xcodebuild clean test \
+              -project "$PROJECT" \
+              -scheme "$SCHEME" \
+              -destination "$DESTINATION" \
+              CODE_SIGNING_ALLOWED=NO
+          else
+            echo "No .xcworkspace or .xcodeproj found; nothing to test."
+            exit 0
+          fi
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: |
+            **/*.xcresult
+            ~/Library/Developer/Xcode/DerivedData/**/Logs/Test/*.xcactivitylog
