@@ -20,6 +20,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          set -x
           echo "Xcode version:"
           xcodebuild -version
 
@@ -35,11 +36,19 @@ jobs:
           echo "Booting simulator $UDID (if not already booted)"
           xcrun simctl boot "$UDID" || true
           echo "Waiting for simulator to be fully booted"
-          xcrun simctl bootstatus "$UDID" -b -s || true
+          xcrun simctl bootstatus "$UDID" -b || true
 
           DERIVED_DATA="$RUNNER_TEMP/DerivedData"
           rm -rf "$DERIVED_DATA"
           mkdir -p "$DERIVED_DATA"
+
+          # If CocoaPods is used, install and run pod install
+          PODFILE=$(find . -name "Podfile" | head -n 1 || true)
+          if [ -n "$PODFILE" ]; then
+            echo "Podfile detected at $PODFILE"
+            sudo gem install cocoapods -N || true
+            (cd "$(dirname "$PODFILE")" && pod install --repo-update) || true
+          fi
 
           # Detect workspace or project using BSD find (no -quit on macOS)
           WORKSPACE=$(find . -type d -name "*.xcworkspace" | head -n 1 | sed 's|^./||')
@@ -63,12 +72,16 @@ jobs:
               -workspace "$WORKSPACE" \
               -scheme "$SCHEME" \
               -destination "$DESTINATION" \
+              -sdk iphonesimulator \
+              -configuration Debug \
               -derivedDataPath "$DERIVED_DATA" \
-              CODE_SIGNING_ALLOWED=NO | xcpretty || true
+              CODE_SIGNING_ALLOWED=NO
             xcodebuild test-without-building \
               -workspace "$WORKSPACE" \
               -scheme "$SCHEME" \
               -destination "$DESTINATION" \
+              -sdk iphonesimulator \
+              -configuration Debug \
               -derivedDataPath "$DERIVED_DATA" \
               -retry-tests-on-failure -test-iterations 2 \
               CODE_SIGNING_ALLOWED=NO
@@ -90,12 +103,16 @@ jobs:
               -project "$PROJECT" \
               -scheme "$SCHEME" \
               -destination "$DESTINATION" \
+              -sdk iphonesimulator \
+              -configuration Debug \
               -derivedDataPath "$DERIVED_DATA" \
-              CODE_SIGNING_ALLOWED=NO | xcpretty || true
+              CODE_SIGNING_ALLOWED=NO
             xcodebuild test-without-building \
               -project "$PROJECT" \
               -scheme "$SCHEME" \
               -destination "$DESTINATION" \
+              -sdk iphonesimulator \
+              -configuration Debug \
               -derivedDataPath "$DERIVED_DATA" \
               -retry-tests-on-failure -test-iterations 2 \
               CODE_SIGNING_ALLOWED=NO
