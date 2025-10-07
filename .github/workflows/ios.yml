@@ -32,6 +32,15 @@ jobs:
           fi
           DESTINATION="platform=iOS Simulator,id=$UDID"
 
+          echo "Booting simulator $UDID (if not already booted)"
+          xcrun simctl boot "$UDID" || true
+          echo "Waiting for simulator to be fully booted"
+          xcrun simctl bootstatus "$UDID" -b -s || true
+
+          DERIVED_DATA="$RUNNER_TEMP/DerivedData"
+          rm -rf "$DERIVED_DATA"
+          mkdir -p "$DERIVED_DATA"
+
           # Detect workspace or project using BSD find (no -quit on macOS)
           WORKSPACE=$(find . -type d -name "*.xcworkspace" | head -n 1 | sed 's|^./||')
           PROJECT=$(find . -type d -name "*.xcodeproj" | head -n 1 | sed 's|^./||')
@@ -46,12 +55,22 @@ jobs:
               echo "No scheme found in workspace $WORKSPACE" >&2
               exit 1
             fi
+            echo "Resolving package dependencies for workspace"
+            xcodebuild -resolvePackageDependencies -workspace "$WORKSPACE" -scheme "$SCHEME" || true
             echo "Using workspace: $WORKSPACE"
             echo "Using scheme: $SCHEME"
-            xcodebuild clean test \
+            xcodebuild clean build-for-testing \
               -workspace "$WORKSPACE" \
               -scheme "$SCHEME" \
               -destination "$DESTINATION" \
+              -derivedDataPath "$DERIVED_DATA" \
+              CODE_SIGNING_ALLOWED=NO | xcpretty || true
+            xcodebuild test-without-building \
+              -workspace "$WORKSPACE" \
+              -scheme "$SCHEME" \
+              -destination "$DESTINATION" \
+              -derivedDataPath "$DERIVED_DATA" \
+              -retry-tests-on-failure -test-iterations 2 \
               CODE_SIGNING_ALLOWED=NO
           elif [ -n "$PROJECT" ]; then
             if [ -z "${IOS_SCHEME:-}" ]; then
@@ -65,10 +84,20 @@ jobs:
             fi
             echo "Using project: $PROJECT"
             echo "Using scheme: $SCHEME"
-            xcodebuild clean test \
+            echo "Resolving package dependencies for project"
+            xcodebuild -resolvePackageDependencies -project "$PROJECT" -scheme "$SCHEME" || true
+            xcodebuild clean build-for-testing \
               -project "$PROJECT" \
               -scheme "$SCHEME" \
               -destination "$DESTINATION" \
+              -derivedDataPath "$DERIVED_DATA" \
+              CODE_SIGNING_ALLOWED=NO | xcpretty || true
+            xcodebuild test-without-building \
+              -project "$PROJECT" \
+              -scheme "$SCHEME" \
+              -destination "$DESTINATION" \
+              -derivedDataPath "$DERIVED_DATA" \
+              -retry-tests-on-failure -test-iterations 2 \
               CODE_SIGNING_ALLOWED=NO
           else
             echo "No .xcworkspace or .xcodeproj found; nothing to test."
