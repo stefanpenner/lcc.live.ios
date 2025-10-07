@@ -24,23 +24,7 @@ jobs:
           xcodebuild -version
 
           # Select a real, available iPhone simulator by UDID (avoid name/OS mismatch)
-          UDID=$(xcrun simctl list devices available -j | python3 - <<'PY' || true
-import sys, json
-data = json.load(sys.stdin)
-udid = None
-for runtime, devices in (data.get('devices') or {}).items():
-    if not runtime.startswith('com.apple.CoreSimulator.SimRuntime.iOS'):
-        continue
-    for d in devices:
-        if d.get('isAvailable') and 'iPhone' in d.get('name',''):
-            udid = d.get('udid')
-            break
-    if udid:
-        break
-if udid:
-    print(udid)
-PY
-          )
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import sys,json; d=json.load(sys.stdin); print(next((dev['udid'] for runtime,devs in (d.get('devices') or {}).items() if runtime.startswith('com.apple.CoreSimulator.SimRuntime.iOS') for dev in devs if dev.get('isAvailable') and 'iPhone' in dev.get('name','')), ''), end='')" || true)
           if [ -z "$UDID" ]; then
             echo "No available iOS iPhone simulator found; skipping tests."
             echo "Hint: Set IOS_SCHEME and ensure simulator runtimes are installed."
@@ -54,14 +38,7 @@ PY
 
           if [ -n "$WORKSPACE" ]; then
             if [ -z "${IOS_SCHEME:-}" ]; then
-              SCHEME=$(xcodebuild -list -json -workspace "$WORKSPACE" | python3 - <<'PY'
-import sys, json
-d=json.load(sys.stdin)
-w=d.get('workspace') or d.get('project') or {}
-schemes=w.get('schemes') or []
-print(schemes[0] if schemes else '', end='')
-PY
-              )
+              SCHEME=$(xcodebuild -list -json -workspace "$WORKSPACE" | python3 -c "import sys,json; d=json.load(sys.stdin); w=d.get('workspace') or d.get('project') or {}; schemes=w.get('schemes') or []; print(schemes[0] if schemes else '', end='')")
             else
               SCHEME="$IOS_SCHEME"
             fi
@@ -78,14 +55,7 @@ PY
               CODE_SIGNING_ALLOWED=NO
           elif [ -n "$PROJECT" ]; then
             if [ -z "${IOS_SCHEME:-}" ]; then
-              SCHEME=$(xcodebuild -list -json -project "$PROJECT" | python3 - <<'PY'
-import sys, json
-d=json.load(sys.stdin)
-p=d.get('project') or {}
-schemes=p.get('schemes') or []
-print(schemes[0] if schemes else '', end='')
-PY
-              )
+              SCHEME=$(xcodebuild -list -json -project "$PROJECT" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('project') or {}; schemes=p.get('schemes') or []; print(schemes[0] if schemes else '', end='')")
             else
               SCHEME="$IOS_SCHEME"
             fi
