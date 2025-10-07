@@ -2,8 +2,13 @@ name: iOS CI
 
 on: [push, pull_request]
 
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ios-tests:
+    if: ${{ hashFiles('**/*.xcodeproj', '**/*.xcworkspace') != '' }}
     name: Build and Test (iOS Simulator)
     runs-on: macos-14
     timeout-minutes: 30
