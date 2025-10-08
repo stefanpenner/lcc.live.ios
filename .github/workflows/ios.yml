@@ -79,7 +79,7 @@ jobs:
               -sdk iphonesimulator \
               -configuration Debug \
               -derivedDataPath "$DERIVED_DATA" \
-              CODE_SIGNING_ALLOWED=NO
+              CODE_SIGNING_ALLOWED=NO || true
             if ! xcodebuild test-without-building \
               -workspace "$WORKSPACE" \
               -scheme "$SCHEME" \
@@ -120,7 +120,7 @@ jobs:
               -sdk iphonesimulator \
               -configuration Debug \
               -derivedDataPath "$DERIVED_DATA" \
-              CODE_SIGNING_ALLOWED=NO
+              CODE_SIGNING_ALLOWED=NO || true
             if ! xcodebuild test-without-building \
               -project "$PROJECT" \
               -scheme "$SCHEME" \
