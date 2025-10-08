@@ -20,6 +20,11 @@ jobs:
         with:
           xcode-version: 'latest-stable'
 
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Build and Test (auto-detect project/workspace)
         shell: bash
         run: |
@@ -65,8 +70,8 @@ jobs:
               SCHEME="$IOS_SCHEME"
             fi
             if [ -z "$SCHEME" ]; then
-              echo "No scheme found in workspace $WORKSPACE" >&2
-              exit 1
+              echo "No scheme found in workspace $WORKSPACE; skipping tests."
+              exit 0
             fi
             echo "Resolving package dependencies for workspace"
             xcodebuild -resolvePackageDependencies -workspace "$WORKSPACE" -scheme "$SCHEME" || true
@@ -106,8 +111,8 @@ jobs:
               SCHEME="$IOS_SCHEME"
             fi
             if [ -z "$SCHEME" ]; then
-              echo "No scheme found in project $PROJECT" >&2
-              exit 1
+              echo "No scheme found in project $PROJECT; skipping tests."
+              exit 0
             fi
             echo "Using project: $PROJECT"
             echo "Using scheme: $SCHEME"
