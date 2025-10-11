@@ -8,17 +8,74 @@ class ImagePreloader: ObservableObject {
     @Published var fadingOut: [URL: Date] = [:]
     private var urls: [URL] = []
     private var timer: Timer?
-    private let refreshInterval: TimeInterval = 5.0
     private var etags: [URL: String] = [:]
     private var lastModifieds: [URL: String] = [:]
     private var hasLoadedOnce: Set<URL> = []
+    private let logger = Logger(category: .imageLoading)
+    
+    private var refreshInterval: TimeInterval {
+        Environment.imageRefreshInterval
+    }
+    
+    // Memory management
+    private let maxCachedImages = 100
+    private var cacheAccessTimes: [URL: Date] = [:]
 
     init() {
         startBackgroundRefresh()
+        setupMemoryWarningHandler()
     }
 
     deinit {
         timer?.invalidate()
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    // MARK: - Memory Management
+    
+    private func setupMemoryWarningHandler() {
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleMemoryWarning()
+        }
+    }
+    
+    private func handleMemoryWarning() {
+        logger.warning("Memory warning received - clearing image cache")
+        
+        // Keep only the most recently accessed images
+        let sortedByAccess = cacheAccessTimes.sorted { $0.value > $1.value }
+        let urlsToKeep = Set(sortedByAccess.prefix(20).map { $0.key })
+        
+        loadedImages = loadedImages.filter { urlsToKeep.contains($0.key) }
+        cacheAccessTimes = cacheAccessTimes.filter { urlsToKeep.contains($0.key) }
+        
+        logger.info("Cleared cache, kept \(loadedImages.count) images")
+        
+        // Track memory warning
+        MetricsService.shared.track(event: .memoryWarning, tags: ["source": "image_cache"])
+    }
+    
+    private func pruneCache() {
+        guard loadedImages.count > maxCachedImages else { return }
+        
+        // Remove least recently accessed images
+        let sortedByAccess = cacheAccessTimes.sorted { $0.value < $1.value }
+        let urlsToRemove = sortedByAccess.prefix(loadedImages.count - maxCachedImages).map { $0.key }
+        
+        for url in urlsToRemove {
+            loadedImages.removeValue(forKey: url)
+            cacheAccessTimes.removeValue(forKey: url)
+        }
+        
+        logger.debug("Pruned cache: removed \(urlsToRemove.count) images")
+    }
+    
+    private func recordAccess(for url: URL) {
+        cacheAccessTimes[url] = Date()
     }
 
     func preloadImages(from urlStrings: [String]) {
@@ -75,53 +132,66 @@ class ImagePreloader: ObservableObject {
     }
 
     private func loadImage(for url: URL, forceRefresh: Bool = false) {
+        let startTime = Date()
+        
         var request = URLRequest(url: url)
         request.cachePolicy = forceRefresh ? .reloadIgnoringLocalCacheData : .useProtocolCachePolicy
+        request.timeoutInterval = Environment.networkTimeout
+        
         DispatchQueue.main.async {
             if self.hasLoadedOnce.contains(url) {
                 self.loading.insert(url)
             }
         }
+        
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
+            
+            let duration = Date().timeIntervalSince(startTime)
+            
             if let error = error {
-                #if DEBUG
-                NSLog("[ImagePreloader] Failed to download image for URL: \(url) - Error: \(error.localizedDescription)")
-                #endif
+                self.logger.error("Failed to download image for URL: \(url.absoluteString)", error: error)
+                
+                // Track failure
+                MetricsService.shared.track(
+                    event: .imageLoadFailure,
+                    duration: duration,
+                    tags: ["url": url.absoluteString, "error": error.localizedDescription]
+                )
+                
                 DispatchQueue.main.async {
                     self.loading.remove(url)
                 }
                 return
             }
+            
             guard let data = data, data.count > 100 else {
-                #if DEBUG
-                NSLog("[ImagePreloader] Image data for URL \(url) is too small or missing.")
-                #endif
+                self.logger.warning("Image data for URL \(url.absoluteString) is too small or missing")
                 DispatchQueue.main.async {
                     self.loading.remove(url)
                 }
                 return
             }
+            
             guard let image = UIImage(data: data) else {
-                #if DEBUG
-                NSLog("[ImagePreloader] Failed to decode image for URL: \(url). Data length: \(data.count)")
-                #endif
+                self.logger.error("Failed to decode image for URL: \(url.absoluteString). Data length: \(data.count)")
                 DispatchQueue.main.async {
                     self.loading.remove(url)
                 }
                 return
             }
+            
             guard let httpResponse = response as? HTTPURLResponse else {
-                #if DEBUG
-                NSLog("[ImagePreloader] No HTTP response for URL: \(url)")
-                #endif
+                self.logger.warning("No HTTP response for URL: \(url.absoluteString)")
                 DispatchQueue.main.async {
                     self.loading.remove(url)
                 }
                 return
             }
+            
             let newEtag = httpResponse.allHeaderFields["Etag"] as? String
             let newLastModified = httpResponse.allHeaderFields["Last-Modified"] as? String
+            
             DispatchQueue.main.async {
                 let prevEtag = self.etags[url]
                 let prevLastModified = self.lastModifieds[url]
@@ -143,10 +213,20 @@ class ImagePreloader: ObservableObject {
                     }
                     return changed
                 }()
+                
                 let isFirstLoad = !self.hasLoadedOnce.contains(url)
                 self.loadedImages[url] = image
+                self.recordAccess(for: url)
                 self.lastRefreshed = Date()
                 self.hasLoadedOnce.insert(url)
+                
+                // Track successful load
+                MetricsService.shared.track(
+                    event: .imageLoadSuccess,
+                    duration: duration,
+                    tags: ["changed": changed ? "true" : "false"]
+                )
+                
                 if changed && !isFirstLoad {
                     self.loading.remove(url)
                     self.fadingOut[url] = Date()
@@ -156,8 +236,12 @@ class ImagePreloader: ObservableObject {
                 } else if !isFirstLoad {
                     self.loading.remove(url)
                 }
+                
                 if let newEtag = newEtag { self.etags[url] = newEtag }
                 if let newLastModified = newLastModified { self.lastModifieds[url] = newLastModified }
+                
+                // Prune cache if needed
+                self.pruneCache()
             }
         }.resume()
     }

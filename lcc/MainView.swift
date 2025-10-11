@@ -225,6 +225,14 @@ struct MainView: View {
                 .animation(.easeOut(duration: 0.3), value: showUIControls)
                 .allowsHitTesting(false) // Don't intercept touches - let them pass through to buttons
                 .zIndex(1.5)
+                
+                // Connection status indicator
+                ConnectionStatusView()
+                    .frame(width: geometry.size.width)
+                    .position(x: geometry.size.width / 2, y: 70)
+                    .opacity(showUIControls ? 1 : 0)
+                    .animation(.easeOut(duration: 0.3), value: showUIControls)
+                    .zIndex(1.6)
             }
             
             // Overlay the fullscreen media if needed

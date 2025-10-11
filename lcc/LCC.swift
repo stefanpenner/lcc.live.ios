@@ -12,12 +12,33 @@ struct LCC
 : App {
     @StateObject private var apiService = APIService()
     @StateObject private var preloader = ImagePreloader()
+    @StateObject private var networkMonitor = NetworkMonitor.shared
+    
+    init() {
+        // Initialize metrics service
+        _ = MetricsService.shared
+        
+        // Print configuration in debug mode
+        Environment.printConfiguration()
+        
+        // Track app launch
+        MetricsService.shared.track(
+            event: .appLaunch,
+            tags: [
+                "version": Environment.appVersion,
+                "build": Environment.buildNumber
+            ]
+        )
+        
+        Logger.app.info("🚀 App launched - Version \(Environment.fullVersion)")
+    }
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(apiService)
                 .environmentObject(preloader)
+                .environmentObject(networkMonitor)
         }
     }
 }

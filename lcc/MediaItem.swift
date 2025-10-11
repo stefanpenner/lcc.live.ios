@@ -22,9 +22,7 @@ struct MediaItem: Identifiable, Hashable {
     static func from(urlString: String) -> MediaItem? {
         // Check if it's a YouTube URL
         if let videoURL = extractYouTubeEmbedURL(from: urlString) {
-            #if DEBUG
-            NSLog("[MediaItem] ✅ Detected YouTube video: \(urlString)")
-            #endif
+            Logger.ui.debug("✅ Detected YouTube video: \(urlString)")
             return MediaItem(type: .youtubeVideo(embedURL: videoURL), url: urlString)
         }
         

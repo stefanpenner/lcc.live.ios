@@ -10,8 +10,15 @@ class APIService: ObservableObject {
     
     private var serverVersion: String?
     private var timer: Timer?
-    private let checkInterval: TimeInterval = 30.0 // Check every 30 seconds
-    private let baseURL = "https://lcc.live"
+    private let logger = Logger(category: .networking)
+    
+    private var baseURL: String {
+        Environment.apiBaseURL
+    }
+    
+    private var checkInterval: TimeInterval {
+        Environment.apiCheckInterval
+    }
     
     init() {
         // Start with empty arrays, fetch from API immediately
@@ -49,16 +56,12 @@ class APIService: ObservableObject {
             
             if let previousVersion = serverVersion {
                 if currentVersion != previousVersion {
-                    #if DEBUG
-                    NSLog("[APIService] Server version changed from \(previousVersion) to \(currentVersion). Refreshing data...")
-                    #endif
+                    logger.info("Server version changed from \(previousVersion) to \(currentVersion). Refreshing data...")
                     await fetchAllImages()
                 }
             }
         } catch {
-            #if DEBUG
-            NSLog("[APIService] Error checking server version: \(error.localizedDescription)")
-            #endif
+            logger.error("Error checking server version", error: error)
         }
     }
     
@@ -67,6 +70,7 @@ class APIService: ObservableObject {
         var request = URLRequest(url: URL(string: baseURL)!)
         request.httpMethod = "HEAD"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = Environment.networkTimeout
         
         let (_, response) = try await URLSession.shared.data(for: request)
         
@@ -120,17 +124,27 @@ class APIService: ObservableObject {
     /// Generic method to fetch media from an endpoint
     private func fetchMedia(from urlString: String, updateType: UpdateType) async {
         guard let url = URL(string: urlString) else {
-            #if DEBUG
-            NSLog("[APIService] Invalid URL: \(urlString)")
-            #endif
+            logger.error("Invalid URL: \(urlString)")
             return
         }
         
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = Environment.networkTimeout
+        
+        // Track API request
+        let startTime = Date()
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
+            
+            // Track successful API call
+            let duration = Date().timeIntervalSince(startTime)
+            MetricsService.shared.track(
+                event: .apiSuccess,
+                duration: duration,
+                tags: ["endpoint": updateType == .lcc ? "lcc" : "bcc"]
+            )
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse
@@ -162,23 +176,29 @@ class APIService: ObservableObject {
                 switch updateType {
                 case .lcc:
                     self.lccMedia = mediaItems
-                    #if DEBUG
-                    NSLog("[APIService] ✅ Fetched \(mediaItems.count) LCC media items from API")
-                    #endif
+                    self.logger.info("✅ Fetched \(mediaItems.count) LCC media items from API")
                 case .bcc:
                     self.bccMedia = mediaItems
-                    #if DEBUG
-                    NSLog("[APIService] ✅ Fetched \(mediaItems.count) BCC media items from API")
-                    #endif
+                    self.logger.info("✅ Fetched \(mediaItems.count) BCC media items from API")
                 }
             }
         } catch {
-            #if DEBUG
-            NSLog("[APIService] ⚠️ Error fetching media from \(urlString): \(error.localizedDescription)")
+            // Track API failure
+            let duration = Date().timeIntervalSince(startTime)
+            MetricsService.shared.track(
+                event: .apiFailure,
+                duration: duration,
+                tags: [
+                    "endpoint": updateType == .lcc ? "lcc" : "bcc",
+                    "error": error.localizedDescription
+                ]
+            )
+            
+            logger.error("⚠️ Error fetching media from \(urlString)", error: error)
             if self.isUsingFallback {
-                NSLog("[APIService] ℹ️ Using fallback data")
+                logger.info("ℹ️ Using fallback data")
             }
-            #endif
+            
             await MainActor.run {
                 self.error = error
             }
@@ -256,9 +276,7 @@ class APIService: ObservableObject {
             throw APIError.invalidJSONFormat
         }
         
-        #if DEBUG
-        NSLog("[APIService] 📊 Parsed \(urlStrings.count) URL strings from API")
-        #endif
+        logger.debug("📊 Parsed \(urlStrings.count) URL strings from API")
         
         // Convert URL strings to MediaItems
         return urlStrings.compactMap { MediaItem.from(urlString: $0) }
