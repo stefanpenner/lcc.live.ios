@@ -114,8 +114,8 @@ enum AppEnvironment {
            let interval = TimeInterval(value) {
             return interval
         }
-        // Refresh less frequently to avoid overwhelming the app
-        return 30.0
+        // Default to 5 seconds for live updates
+        return 5.0
     }
     
     /// API version check interval (seconds)
@@ -124,7 +124,7 @@ enum AppEnvironment {
            let interval = TimeInterval(value) {
             return interval
         }
-        return 30.0
+        return 5.0
     }
     
     // MARK: - Debug Helpers

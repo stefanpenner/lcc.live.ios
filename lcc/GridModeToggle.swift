@@ -21,17 +21,33 @@ private struct ToggleButton: View {
                 .foregroundColor(isSelected ? .accentColor : .secondary)
                 .frame(width: 44, height: 44)
                 .background(
-                    Group {
+                    ZStack {
                         if isSelected {
+                            // Active: Liquid Glass with accent glow
                             Circle()
-                                .fill(Color.accentColor.opacity(0.18))
-                                .shadow(color: Color.accentColor.opacity(0.18), radius: 4, y: 1)
-                        } else {
-                            Color.clear
+                                .fill(.thinMaterial)
+                            
+                            Circle()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [
+                                            Color.accentColor.opacity(0.4),
+                                            Color.accentColor.opacity(0.2),
+                                            Color.accentColor.opacity(0.05)
+                                        ],
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: 22
+                                    )
+                                )
+                            
+                            Circle()
+                                .stroke(Color.accentColor.opacity(0.5), lineWidth: 1.5)
+                                .shadow(color: Color.accentColor.opacity(0.3), radius: 6, y: 2)
                         }
                     }
                 )
-                .animation(.easeInOut(duration: 0.18), value: isSelected)
+                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isSelected)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(mode.rawValue))
@@ -63,11 +79,42 @@ struct GridModeToggle: View {
                 }
             )
         }
-        .padding(6)
+        .padding(8)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground).opacity(0.7))
-                .shadow(radius: 2)
+            ZStack {
+                // Liquid Glass container
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(.ultraThinMaterial)
+                
+                // Refraction gradient
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.12),
+                                Color.white.opacity(0.04),
+                                Color.clear
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                
+                // Luminous edge
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.25),
+                                Color.white.opacity(0.05)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            }
+            .shadow(color: Color.black.opacity(0.12), radius: 10, y: 4)
         )
         .padding([.top, .trailing], 8)
     }

@@ -25,6 +25,7 @@ struct MainView: View {
     @State private var overlayUUID = UUID()
     @State private var showUIControls = true
     @State private var uiControlsTimer: Timer?
+    @State private var showConnectionDetails = false
     
     private var currentMediaItems: [MediaItem] {
         selectedTab == 0 ? mediaItems.lcc : mediaItems.bcc
@@ -67,10 +68,13 @@ struct MainView: View {
             showUIControls = true
         }
         
-        // Auto-hide after 3 seconds of no activity
+        // Auto-hide after 3 seconds of no activity (unless connection dialog is open)
         uiControlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
-            withAnimation(.easeOut(duration: 0.3)) {
-                showUIControls = false
+            // Don't hide if connection details dialog is open
+            if !showConnectionDetails {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showUIControls = false
+                }
             }
         }
     }
@@ -225,13 +229,6 @@ struct MainView: View {
                 .animation(.easeOut(duration: 0.3), value: showUIControls)
                 .allowsHitTesting(false) // Don't intercept touches - let them pass through to buttons
                 .zIndex(1.5)
-                
-                // Connection status indicator (top-right corner)
-                ConnectionStatusView()
-                    .position(x: geometry.size.width - 60, y: 60)
-                    .opacity(showUIControls ? 1 : 0)
-                    .animation(.easeOut(duration: 0.3), value: showUIControls)
-                    .zIndex(1.6)
             }
             
             // Overlay the fullscreen media if needed
@@ -285,7 +282,8 @@ struct MainView: View {
             if fullScreenMedia == nil {
                 ModernTabBar(
                     tabs: ["LCC", "BCC"],
-                    selectedTab: $selectedTab
+                    selectedTab: $selectedTab,
+                    showConnectionDetails: $showConnectionDetails
                 )
                 .frame(height: tabBarHeight)
                 .padding(.top, isLandscape ? 12 : 4)
@@ -306,6 +304,15 @@ struct MainView: View {
         }
         .onChange(of: fullScreenMedia) { _, newValue in
             isAnyFullScreen = newValue != nil
+        }
+        .onChange(of: showConnectionDetails) { _, isOpen in
+            // When dialog closes, restart auto-hide timer
+            if !isOpen {
+                resetUIControlsTimer()
+            } else {
+                // When dialog opens, cancel auto-hide timer
+                uiControlsTimer?.invalidate()
+            }
         }
         .onAppear {
             // Show controls on initial load with auto-hide

@@ -4,7 +4,7 @@ import SwiftUI
 struct ConnectionStatusView: View {
     @EnvironmentObject var networkMonitor: NetworkMonitor
     @EnvironmentObject var apiService: APIService
-    @State private var showDetails = false
+    @Binding var showDetails: Bool
     
     var body: some View {
         HStack(spacing: 6) {
@@ -25,11 +25,32 @@ struct ConnectionStatusView: View {
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+        .padding(.vertical, 6)
         .background(
-            Capsule()
-                .fill(Color(.systemBackground).opacity(0.8))
-                .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 1)
+            ZStack {
+                // Liquid Glass base
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                
+                // Status-colored refraction
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                statusColor.opacity(0.15),
+                                statusColor.opacity(0.05),
+                                Color.clear
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                
+                // Luminous edge based on status
+                Capsule()
+                    .stroke(statusColor.opacity(0.3), lineWidth: 1)
+            }
+            .shadow(color: statusColor.opacity(0.2), radius: 6, y: 2)
         )
         .onTapGesture {
             withAnimation(.spring(response: 0.3)) {
@@ -155,8 +176,28 @@ struct ConnectionDetailsView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .padding()
-        .frame(width: 300)
+        .padding(20)
+        .frame(width: 320)
+        .background(
+            ZStack {
+                // Liquid Glass popover background
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.regularMaterial)
+                
+                // Subtle refraction
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.08),
+                                Color.clear
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+        )
     }
     
     private func timeAgoString(from date: Date) -> String {
@@ -204,7 +245,7 @@ struct StatusRow: View {
     let preloader = ImagePreloader()
     let networkMonitor = NetworkMonitor()
     
-    return ConnectionStatusView()
+    return ConnectionStatusView(showDetails: .constant(false))
         .environmentObject(apiService)
         .environmentObject(preloader)
         .environmentObject(networkMonitor)
