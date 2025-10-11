@@ -10,9 +10,15 @@ struct PhotoTabView: View {
     var onScrollActivity: (() -> Void)?
     var onScrollDirectionChanged: ((ScrollDirection) -> Void)?
     @EnvironmentObject var preloader: ImagePreloader
+    @EnvironmentObject var apiService: APIService
 
     @Environment(\.colorScheme) var colorScheme
     @State private var isRefreshing = false
+    @State private var hasCompletedInitialLoad = false
+    @State private var isCompletingLoad = false // Prevent multiple completion triggers
+    @State private var hasReceivedInitialPayload = false // Track if API has responded
+    
+    private let logger = Logger(category: .ui)
     
     enum ScrollDirection {
         case up
@@ -37,18 +43,23 @@ struct PhotoTabView: View {
             let imageHeight = imageWidth * (gridMode == .single ? 0.9 : 0.9)
             let gridItems = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: columns)
             
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Pull-to-refresh area
-                        Color.clear
-                            .frame(height: 60)
-                            .id("top")
-                        
-                        if mediaItems.isEmpty {
-                            EmptyStateView()
-                                .frame(width: availableWidth, height: geometry.size.height * 0.6)
-                        } else {
+            ZStack {
+                // Main content
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            // Pull-to-refresh area
+                            Color.clear
+                                .frame(height: 60)
+                                .id("top")
+                            
+                            if mediaItems.isEmpty {
+                                // Only show empty state after we've received API response
+                                if hasReceivedInitialPayload {
+                                    EmptyStateView()
+                                        .frame(width: availableWidth, height: geometry.size.height * 0.6)
+                                }
+                            } else {
                             LazyVGrid(columns: gridItems, spacing: spacing) {
                                 ForEach(mediaItems, id: \.id) { mediaItem in
                                     MediaCell(
@@ -56,6 +67,7 @@ struct PhotoTabView: View {
                                         imageWidth: imageWidth,
                                         imageHeight: imageHeight,
                                         colorScheme: colorScheme,
+                                        hasCompletedInitialLoad: hasCompletedInitialLoad,
                                         onTap: {
                                             onRequestFullScreen(PresentedMedia(mediaItem: mediaItem))
                                         },
@@ -108,20 +120,122 @@ struct PhotoTabView: View {
                             }
                         }
                 )
-            }
-            .refreshable {
-                await performRefresh()
-            }
-            .ignoresSafeArea(edges: .bottom)
-            .safeAreaInset(edge: .bottom) {
-                // Reserve space for the floating GridModeToggle
-                Color.clear
-                    .frame(height: 70)
+                }
+                .refreshable {
+                    await performRefresh()
+                }
+                .ignoresSafeArea(edges: .bottom)
+                .safeAreaInset(edge: .bottom) {
+                    // Reserve space for the floating GridModeToggle
+                    Color.clear
+                        .frame(height: 70)
+                }
+                
+                // Unified loading overlay during initial load
+                if !hasCompletedInitialLoad && !mediaItems.isEmpty {
+                    VStack(spacing: 0) {
+                        // Spacer below menu
+                        Color.clear
+                            .frame(height: 80)
+                        
+                        InitialLoadingView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.ultraThinMaterial)
+                    .transition(.opacity)
+                }
             }
         }
         .onAppear {
+            logger.info("📱 PhotoTabView appeared with \(mediaItems.count) media items")
+            logger.debug("Initial state - hasReceivedPayload: \(hasReceivedInitialPayload), hasCompletedLoad: \(hasCompletedInitialLoad)")
+            
             preloader.preloadMedia(from: mediaItems)
             preloader.refreshImages()
+            
+            // Check completion status periodically
+            Task { @MainActor in
+                for iteration in 0..<50 { // Check every 100ms for up to 5 seconds
+                    try? await Task.sleep(for: .milliseconds(100))
+                    checkInitialLoadCompletion()
+                    if hasCompletedInitialLoad {
+                        logger.info("✅ Initial load completed at iteration \(iteration)")
+                        break
+                    }
+                }
+                
+                // Safety timeout: mark initial load as complete after 5 seconds regardless
+                if !hasCompletedInitialLoad {
+                    logger.warning("⏱️ Safety timeout triggered - forcing initial load completion")
+                    withAnimation(.easeOut(duration: 0.4)) {
+                        hasCompletedInitialLoad = true
+                    }
+                }
+            }
+        }
+        .onChange(of: preloader.loadedImages.count) { _, _ in
+            checkInitialLoadCompletion()
+        }
+        .onChange(of: preloader.loading.count) { _, _ in
+            checkInitialLoadCompletion()
+        }
+        .onChange(of: mediaItems.isEmpty) { _, isEmpty in
+            // Mark that we've received API payload once we have items
+            if !isEmpty {
+                hasReceivedInitialPayload = true
+            }
+        }
+        .onChange(of: apiService.isLoading) { _, isLoading in
+            // Mark payload received when API completes (whether we have items or not)
+            if !isLoading {
+                hasReceivedInitialPayload = true
+                
+                // If API loading completes with no images, mark initial load as done
+                if mediaItems.isEmpty {
+                    hasCompletedInitialLoad = true
+                }
+            }
+        }
+    }
+    
+    private func checkInitialLoadCompletion() {
+        guard !hasCompletedInitialLoad && !isCompletingLoad && !mediaItems.isEmpty else { return }
+        
+        // Get all image URLs from media items (excluding videos)
+        let imageUrls = mediaItems
+            .filter { !$0.type.isVideo }
+            .compactMap { URL(string: $0.url) }
+        
+        guard !imageUrls.isEmpty else {
+            // All items are videos, complete immediately
+            hasCompletedInitialLoad = true
+            return
+        }
+        
+        // Count images in different states
+        let loadedCount = imageUrls.filter { preloader.loadedImages[$0] != nil }.count
+        let loadingCount = imageUrls.filter { preloader.loading.contains($0) }.count
+        
+        // Only complete if:
+        // 1. No images are actively loading
+        // 2. We have loaded at least 50% of images OR all possible images have loaded
+        let minimumLoaded = imageUrls.count / 2
+        let allImagesFinal = loadingCount == 0
+        let enoughLoaded = loadedCount >= minimumLoaded && loadingCount == 0
+        
+        if allImagesFinal || enoughLoaded {
+            isCompletingLoad = true
+            
+            // Add a small delay for smooth transition
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                withAnimation(.easeOut(duration: 0.4)) {
+                    hasCompletedInitialLoad = true
+                }
+            }
         }
     }
     
@@ -139,6 +253,7 @@ private struct MediaCell: View {
     let imageWidth: CGFloat
     let imageHeight: CGFloat
     let colorScheme: ColorScheme
+    let hasCompletedInitialLoad: Bool
     let onTap: () -> Void
     let onRetry: () -> Void
 
@@ -183,11 +298,11 @@ private struct MediaCell: View {
                             }
                             .accessibilityLabel("Camera image")
                             .accessibilityAddTraits(.isImage)
-                    } else if preloader.loading.contains(url) || isRetrying {
-                        // Show shimmer loading state
+                    } else if preloader.loading.contains(url) || isRetrying || !hasCompletedInitialLoad {
+                        // Show shimmer loading state (including during initial load)
                         ShimmerView(width: imageWidth, height: imageHeight, colorScheme: colorScheme)
                     } else {
-                        // Show error state with retry
+                        // Show error state with retry (only after initial load completes)
                         Button(action: {
                             #if os(iOS)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -299,13 +414,118 @@ private struct LastUpdatedView: View {
     }
 }
 
+private struct InitialLoadingView: View {
+    @State private var isAnimating = false
+    @State private var phase: CGFloat = 0
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            ZStack {
+                // Outer pulsing ring - Liquid Glass
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.accentColor.opacity(0.3),
+                                Color.accentColor.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 3
+                    )
+                    .frame(width: 80, height: 80)
+                    .scaleEffect(isAnimating ? 1.2 : 1.0)
+                    .opacity(isAnimating ? 0.0 : 1.0)
+                
+                // Middle ring
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.accentColor.opacity(0.5),
+                                Color.accentColor.opacity(0.2)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 4
+                    )
+                    .frame(width: 60, height: 60)
+                    .scaleEffect(isAnimating ? 1.15 : 1.0)
+                    .opacity(isAnimating ? 0.2 : 1.0)
+                
+                // Inner core - Solid glass
+                ZStack {
+                    Circle()
+                        .fill(.thinMaterial)
+                        .frame(width: 50, height: 50)
+                    
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.accentColor.opacity(0.6),
+                                    Color.accentColor.opacity(0.3),
+                                    Color.accentColor.opacity(0.1)
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 25
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+                    
+                    // Spinning shimmer
+                    Circle()
+                        .trim(from: 0, to: 0.3)
+                        .stroke(
+                            Color.accentColor.opacity(0.8),
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                        )
+                        .frame(width: 50, height: 50)
+                        .rotationEffect(.degrees(phase * 360))
+                }
+                .shadow(color: Color.accentColor.opacity(0.4), radius: 10)
+            }
+            
+            VStack(spacing: 8) {
+                Text("Loading Streams")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                
+                Text("Preparing your live feed...")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onAppear {
+            // Pulsing animation
+            withAnimation(
+                .easeInOut(duration: 1.5)
+                .repeatForever(autoreverses: true)
+            ) {
+                isAnimating = true
+            }
+            
+            // Spinning animation
+            withAnimation(
+                .linear(duration: 2.0)
+                .repeatForever(autoreverses: false)
+            ) {
+                phase = 1.0
+            }
+        }
+    }
+}
+
 private struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "photo.on.rectangle.angled")
+            Image(systemName: "video.slash")
                 .font(.system(size: 60))
                 .foregroundColor(.secondary.opacity(0.5))
-            Text("No Images Available")
+            Text("No Streams Available")
                 .font(.title3)
                 .fontWeight(.medium)
                 .foregroundColor(.secondary)
@@ -314,7 +534,7 @@ private struct EmptyStateView: View {
                 .foregroundColor(.secondary.opacity(0.7))
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("No images available. Pull down to refresh.")
+        .accessibilityLabel("No streams available. Pull down to refresh.")
     }
 }
 

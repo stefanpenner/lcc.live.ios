@@ -277,6 +277,7 @@ struct MainView: View {
                 }
             }
             }
+            .clipped() // Prevent adjacent screens from showing through edges
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if fullScreenMedia == nil {
