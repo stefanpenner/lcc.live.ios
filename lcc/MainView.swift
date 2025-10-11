@@ -130,7 +130,7 @@ struct MainView: View {
                 }
                 .offset(x: -CGFloat(selectedTab) * geometry.size.width + dragOffset)
                 .allowsHitTesting(!isAnyFullScreen)
-                .ignoresSafeArea(edges: [.top, .bottom])
+                .ignoresSafeArea(edges: [.top, .bottom, .leading, .trailing])
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 20)
                         .onChanged { value in
@@ -211,24 +211,40 @@ struct MainView: View {
                     resetUIControlsTimer()
                 }
             
-            // Top gradient overlay (at the very top, Photos app style)
+            // Edge-to-edge blur overlays for depth
             if fullScreenMedia == nil {
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(.systemBackground).opacity(0.95),
-                        Color(.systemBackground).opacity(0.7),
-                        Color(.systemBackground).opacity(0.0),
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(width: geometry.size.width, height: 80)
-                .position(x: geometry.size.width / 2, y: 40)
-                .ignoresSafeArea(edges: .top)
-                .opacity(showUIControls ? 1 : 0)
-                .animation(.easeOut(duration: 0.3), value: showUIControls)
-                .allowsHitTesting(false) // Don't intercept touches - let them pass through to buttons
-                .zIndex(1.5)
+                VStack(spacing: 0) {
+                    // Top blur gradient
+                    LinearGradient(
+                        gradient: Gradient(stops: [
+                            .init(color: Color.black.opacity(0.4), location: 0.0),
+                            .init(color: Color.black.opacity(0.2), location: 0.3),
+                            .init(color: Color.clear, location: 1.0)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 120)
+                    .blur(radius: 8)
+                    
+                    Spacer()
+                    
+                    // Bottom blur gradient
+                    LinearGradient(
+                        gradient: Gradient(stops: [
+                            .init(color: Color.clear, location: 0.0),
+                            .init(color: Color.black.opacity(0.2), location: 0.7),
+                            .init(color: Color.black.opacity(0.4), location: 1.0)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 120)
+                    .blur(radius: 8)
+                }
+                .ignoresSafeArea(edges: .all)
+                .allowsHitTesting(false)
+                .zIndex(1.4)
             }
             
             // Overlay the fullscreen media if needed
@@ -239,14 +255,7 @@ struct MainView: View {
                     onDismiss: {
                         withAnimation { fullScreenMedia = nil }
                     },
-                    onTabChange: { newTab in
-                        #if DEBUG
-                        print("🔄 MainView: Tab change from fullscreen: \(newTab)")
-                        #endif
-                        withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
-                            selectedTab = newTab
-                        }
-                    }
+                    onTabChange: nil // Do not allow tab switching from fullscreen
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
@@ -277,9 +286,11 @@ struct MainView: View {
                 }
             }
             }
+            .background(Color.black)
+            .edgesIgnoringSafeArea(.all)
             .clipped() // Prevent adjacent screens from showing through edges
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .overlay(alignment: .top) {
             if fullScreenMedia == nil {
                 ModernTabBar(
                     tabs: ["LCC", "BCC"],
@@ -288,7 +299,6 @@ struct MainView: View {
                 )
                 .frame(height: tabBarHeight)
                 .padding(.top, isLandscape ? 12 : 4)
-                .zIndex(10) // High zIndex to ensure it's above gradient
                 .opacity(showUIControls ? 1 : 0)
                 .offset(y: showUIControls ? 0 : -10)
                 .animation(.easeOut(duration: 0.3), value: showUIControls)

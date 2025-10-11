@@ -33,13 +33,13 @@ struct PhotoTabView: View {
         var id: String { rawValue }
     }
 
-    private let spacing: CGFloat = 5
+    private let spacing: CGFloat = 2 // Minimal spacing for edge-to-edge feel
 
     var body: some View {
         GeometryReader { geometry in
-            let availableWidth = geometry.size.width - (spacing * 1)
+            let availableWidth = geometry.size.width
             let columns = gridMode == .single ? 1 : max(1, Int(availableWidth / 180))
-            let imageWidth = (availableWidth - CGFloat(columns - 1) * 5) / CGFloat(columns)
+            let imageWidth = (availableWidth - CGFloat(columns - 1) * spacing) / CGFloat(columns)
             let imageHeight = imageWidth * (gridMode == .single ? 0.9 : 0.9)
             let gridItems = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: columns)
             
@@ -48,11 +48,6 @@ struct PhotoTabView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
-                            // Pull-to-refresh area
-                            Color.clear
-                                .frame(height: 60)
-                                .id("top")
-                            
                             if mediaItems.isEmpty {
                                 // Only show empty state after we've received API response
                                 if hasReceivedInitialPayload {
@@ -61,6 +56,11 @@ struct PhotoTabView: View {
                                 }
                             } else {
                             LazyVGrid(columns: gridItems, spacing: spacing) {
+                                // Minimal top spacer - content starts behind island
+                                Color.clear
+                                    .frame(height: 0)
+                                    .gridCellColumns(columns)
+                                
                                 ForEach(mediaItems, id: \.id) { mediaItem in
                                     MediaCell(
                                         mediaItem: mediaItem,
@@ -78,14 +78,14 @@ struct PhotoTabView: View {
                                         }
                                     )
                                 }
+                                
+                                // Bottom spacer for grid mode toggle
+                                Color.clear
+                                    .frame(height: 70)
+                                    .gridCellColumns(columns)
                             }
                             .frame(maxWidth: .infinity)
                         }
-                        
-                        // Bottom spacer to ensure we can scroll
-                        Color.clear
-                            .frame(height: 100)
-                            .id("bottom")
                     }
                 }
                 .simultaneousGesture(
@@ -124,27 +124,20 @@ struct PhotoTabView: View {
                 .refreshable {
                     await performRefresh()
                 }
-                .ignoresSafeArea(edges: .bottom)
-                .safeAreaInset(edge: .bottom) {
-                    // Reserve space for the floating GridModeToggle
-                    Color.clear
-                        .frame(height: 70)
-                }
+                .ignoresSafeArea(edges: .all)
+                .scrollContentBackground(.hidden)
+                .background(Color.black)
+                .modifier(ZeroScrollContentMarginsIfAvailable())
                 
                 // Unified loading overlay during initial load
                 if !hasCompletedInitialLoad && !mediaItems.isEmpty {
                     VStack(spacing: 0) {
-                        // Spacer below menu
-                        Color.clear
-                            .frame(height: 80)
-                        
                         InitialLoadingView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        
-                        Spacer()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.ultraThinMaterial)
+                    .ignoresSafeArea()
                     .transition(.opacity)
                 }
             }
@@ -183,18 +176,25 @@ struct PhotoTabView: View {
             checkInitialLoadCompletion()
         }
         .onChange(of: mediaItems.isEmpty) { _, isEmpty in
+            logger.debug("📊 Media items empty changed: \(isEmpty)")
+            
             // Mark that we've received API payload once we have items
-            if !isEmpty {
+            if !isEmpty && !hasReceivedInitialPayload {
+                logger.info("📦 Received API payload with \(mediaItems.count) items")
                 hasReceivedInitialPayload = true
             }
         }
         .onChange(of: apiService.isLoading) { _, isLoading in
+            logger.debug("🔄 API loading state changed: \(isLoading)")
+            
             // Mark payload received when API completes (whether we have items or not)
-            if !isLoading {
+            if !isLoading && !hasReceivedInitialPayload {
+                logger.info("📦 API loading completed - mediaItems: \(mediaItems.count)")
                 hasReceivedInitialPayload = true
                 
                 // If API loading completes with no images, mark initial load as done
                 if mediaItems.isEmpty {
+                    logger.info("⚠️ No media items after API load - completing initial load")
                     hasCompletedInitialLoad = true
                 }
             }
@@ -211,6 +211,7 @@ struct PhotoTabView: View {
         
         guard !imageUrls.isEmpty else {
             // All items are videos, complete immediately
+            logger.info("🎬 All items are videos - completing initial load immediately")
             hasCompletedInitialLoad = true
             return
         }
@@ -219,6 +220,8 @@ struct PhotoTabView: View {
         let loadedCount = imageUrls.filter { preloader.loadedImages[$0] != nil }.count
         let loadingCount = imageUrls.filter { preloader.loading.contains($0) }.count
         
+        logger.debug("🔍 Load check - Total: \(imageUrls.count), Loaded: \(loadedCount), Loading: \(loadingCount)")
+        
         // Only complete if:
         // 1. No images are actively loading
         // 2. We have loaded at least 50% of images OR all possible images have loaded
@@ -226,7 +229,19 @@ struct PhotoTabView: View {
         let allImagesFinal = loadingCount == 0
         let enoughLoaded = loadedCount >= minimumLoaded && loadingCount == 0
         
-        if allImagesFinal || enoughLoaded {
+        if allImagesFinal {
+            logger.info("🏁 All images final - Loaded: \(loadedCount)/\(imageUrls.count), triggering completion")
+            isCompletingLoad = true
+            
+            // Add a small delay for smooth transition
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                withAnimation(.easeOut(duration: 0.4)) {
+                    hasCompletedInitialLoad = true
+                }
+            }
+        } else if enoughLoaded {
+            logger.info("✨ Enough images loaded - \(loadedCount)/\(imageUrls.count) (minimum: \(minimumLoaded)), triggering completion")
             isCompletingLoad = true
             
             // Add a small delay for smooth transition
@@ -271,8 +286,7 @@ private struct MediaCell: View {
                             width: imageWidth,
                             height: imageHeight
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                        .clipped()
                         .onTapGesture {
                             onTap()
                         }
@@ -291,8 +305,6 @@ private struct MediaCell: View {
                             .aspectRatio(contentMode: .fill)
                             .frame(width: imageWidth, height: imageHeight)
                             .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
                             .onTapGesture {
                                 onTap()
                             }
@@ -356,8 +368,8 @@ private struct MediaCell: View {
                         return min(1, max(0, elapsed / duration))
                     }()
                     let borderOpacity: CGFloat = isFadingOut ? (1 - fadeProgress) : (isLoading ? 0.3 : 0)
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.accentColor.opacity(0.60), lineWidth: 4)
+                    Rectangle()
+                        .stroke(Color.accentColor.opacity(0.60), lineWidth: 3)
                         .frame(width: imageWidth, height: imageHeight)
                         .opacity(borderOpacity)
                         .animation(.easeInOut(duration: 0.4), value: borderOpacity)
@@ -597,6 +609,17 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+// Apply zero content margins on iOS 17+ so scroll content extends edge-to-edge
+private struct ZeroScrollContentMarginsIfAvailable: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.contentMargins(.zero, for: .scrollContent)
+        } else {
+            content
+        }
     }
 }
 
