@@ -48,13 +48,13 @@ struct Logger {
     
     init(category: Category) {
         self.category = category
-        self.logger = os.Logger(subsystem: Environment.bundleIdentifier, category: category.rawValue)
+        self.logger = os.Logger(subsystem: AppEnvironment.bundleIdentifier, category: category.rawValue)
     }
     
     // MARK: - Logging Methods
     
     func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        guard Environment.debugLoggingEnabled else { return }
+        guard AppEnvironment.debugLoggingEnabled else { return }
         let context = formatContext(file: file, function: function, line: line)
         logger.debug("[\(context)] \(message)")
     }

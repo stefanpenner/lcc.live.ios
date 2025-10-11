@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// 📊 Metrics Collection Service
 ///
@@ -82,7 +83,7 @@ class MetricsService: ObservableObject {
     // MARK: - Initialization
     
     init() {
-        guard Environment.metricsEnabled else {
+        guard AppEnvironment.metricsEnabled else {
             logger.info("Metrics collection disabled")
             return
         }
@@ -102,7 +103,7 @@ class MetricsService: ObservableObject {
     
     /// Track a simple event
     func track(event: Event, value: Double = 1.0, tags: [String: String] = [:]) {
-        guard Environment.metricsEnabled else { return }
+        guard AppEnvironment.metricsEnabled else { return }
         
         let metric = createMetric(
             event: event.rawValue,
@@ -116,7 +117,7 @@ class MetricsService: ObservableObject {
     
     /// Track an event with duration
     func track(event: Event, duration: TimeInterval, tags: [String: String] = [:]) {
-        guard Environment.metricsEnabled else { return }
+        guard AppEnvironment.metricsEnabled else { return }
         
         let metric = createMetric(
             event: event.rawValue,
@@ -158,8 +159,8 @@ class MetricsService: ObservableObject {
         
         return Metric(
             app: "lcc-ios",
-            version: Environment.appVersion,
-            build: Environment.buildNumber,
+            version: AppEnvironment.appVersion,
+            build: AppEnvironment.buildNumber,
             event: event,
             value: value,
             durationMs: duration,
@@ -204,8 +205,8 @@ class MetricsService: ObservableObject {
     }
     
     private func sendMetrics(_ metrics: [Metric]) async {
-        guard let url = URL(string: Environment.metricsURL) else {
-            logger.error("Invalid metrics URL: \(Environment.metricsURL)")
+        guard let url = URL(string: AppEnvironment.metricsURL) else {
+            logger.error("Invalid metrics URL: \(AppEnvironment.metricsURL)")
             return
         }
         

@@ -19,18 +19,18 @@ struct LCC
         _ = MetricsService.shared
         
         // Print configuration in debug mode
-        Environment.printConfiguration()
+        AppEnvironment.printConfiguration()
         
         // Track app launch
         MetricsService.shared.track(
             event: .appLaunch,
             tags: [
-                "version": Environment.appVersion,
-                "build": Environment.buildNumber
+                "version": AppEnvironment.appVersion,
+                "build": AppEnvironment.buildNumber
             ]
         )
         
-        Logger.app.info("🚀 App launched - Version \(Environment.fullVersion)")
+        Logger.app.info("🚀 App launched - Version \(AppEnvironment.fullVersion)")
     }
     
     var body: some Scene {

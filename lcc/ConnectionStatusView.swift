@@ -150,7 +150,7 @@ struct ConnectionDetailsView: View {
                 Text("App Version")
                     .font(.caption.bold())
                     .foregroundColor(.secondary)
-                Text(Environment.fullVersion)
+                Text(AppEnvironment.fullVersion)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

@@ -226,10 +226,9 @@ struct MainView: View {
                 .allowsHitTesting(false) // Don't intercept touches - let them pass through to buttons
                 .zIndex(1.5)
                 
-                // Connection status indicator
+                // Connection status indicator (top-right corner)
                 ConnectionStatusView()
-                    .frame(width: geometry.size.width)
-                    .position(x: geometry.size.width / 2, y: 70)
+                    .position(x: geometry.size.width - 60, y: 60)
                     .opacity(showUIControls ? 1 : 0)
                     .animation(.easeOut(duration: 0.3), value: showUIControls)
                     .zIndex(1.6)

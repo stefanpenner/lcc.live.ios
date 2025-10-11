@@ -300,21 +300,21 @@ struct APIServiceTests {
     }
 }
 
-@Suite("Environment Tests")
-struct EnvironmentTests {
+@Suite("AppEnvironment Tests")
+struct AppEnvironmentTests {
     
-    @Test("Environment has valid configuration")
+    @Test("AppEnvironment has valid configuration")
     func testEnvironmentConfig() {
-        #expect(!Environment.apiBaseURL.isEmpty, "API base URL should be set")
-        #expect(!Environment.metricsURL.isEmpty, "Metrics URL should be set")
-        #expect(!Environment.appVersion.isEmpty, "App version should be set")
-        #expect(!Environment.buildNumber.isEmpty, "Build number should be set")
+        #expect(!AppEnvironment.apiBaseURL.isEmpty, "API base URL should be set")
+        #expect(!AppEnvironment.metricsURL.isEmpty, "Metrics URL should be set")
+        #expect(!AppEnvironment.appVersion.isEmpty, "App version should be set")
+        #expect(!AppEnvironment.buildNumber.isEmpty, "Build number should be set")
     }
     
-    @Test("Environment timeouts are reasonable")
+    @Test("AppEnvironment timeouts are reasonable")
     func testTimeouts() {
-        #expect(Environment.networkTimeout > 0, "Network timeout should be positive")
-        #expect(Environment.imageRefreshInterval > 0, "Refresh interval should be positive")
-        #expect(Environment.apiCheckInterval > 0, "API check interval should be positive")
+        #expect(AppEnvironment.networkTimeout > 0, "Network timeout should be positive")
+        #expect(AppEnvironment.imageRefreshInterval > 0, "Refresh interval should be positive")
+        #expect(AppEnvironment.apiCheckInterval > 0, "API check interval should be positive")
     }
 }

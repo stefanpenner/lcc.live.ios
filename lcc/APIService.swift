@@ -13,11 +13,11 @@ class APIService: ObservableObject {
     private let logger = Logger(category: .networking)
     
     private var baseURL: String {
-        Environment.apiBaseURL
+        AppEnvironment.apiBaseURL
     }
     
     private var checkInterval: TimeInterval {
-        Environment.apiCheckInterval
+        AppEnvironment.apiCheckInterval
     }
     
     init() {
@@ -70,7 +70,7 @@ class APIService: ObservableObject {
         var request = URLRequest(url: URL(string: baseURL)!)
         request.httpMethod = "HEAD"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = Environment.networkTimeout
+        request.timeoutInterval = AppEnvironment.networkTimeout
         
         let (_, response) = try await URLSession.shared.data(for: request)
         
@@ -130,7 +130,7 @@ class APIService: ObservableObject {
         
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = Environment.networkTimeout
+        request.timeoutInterval = AppEnvironment.networkTimeout
         
         // Track API request
         let startTime = Date()

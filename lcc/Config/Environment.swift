@@ -11,9 +11,9 @@ import Foundation
 ///
 /// **Example:**
 /// ```swift
-/// let url = Environment.apiBaseURL  // Uses .env.local in debug
+/// let url = AppEnvironment.apiBaseURL  // Uses .env.local in debug
 /// ```
-enum Environment {
+enum AppEnvironment {
     
     // MARK: - API Configuration
     
@@ -80,7 +80,12 @@ enum Environment {
     
     /// Enable metrics collection
     static var metricsEnabled: Bool {
-        ProcessInfo.processInfo.environment["METRICS_ENABLED"] != "false"
+        #if DEBUG
+        // Disable metrics in debug by default to improve performance
+        return ProcessInfo.processInfo.environment["METRICS_ENABLED"] == "true"
+        #else
+        return ProcessInfo.processInfo.environment["METRICS_ENABLED"] != "false"
+        #endif
     }
     
     /// Enable debug logging
@@ -109,7 +114,8 @@ enum Environment {
            let interval = TimeInterval(value) {
             return interval
         }
-        return 5.0
+        // Refresh less frequently to avoid overwhelming the app
+        return 30.0
     }
     
     /// API version check interval (seconds)

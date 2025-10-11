@@ -14,12 +14,17 @@ class ImagePreloader: ObservableObject {
     private let logger = Logger(category: .imageLoading)
     
     private var refreshInterval: TimeInterval {
-        Environment.imageRefreshInterval
+        AppEnvironment.imageRefreshInterval
     }
     
     // Memory management
     private let maxCachedImages = 100
     private var cacheAccessTimes: [URL: Date] = [:]
+    
+    // Efficient refresh queue
+    private var refreshQueue: [URL] = []
+    private let maxConcurrentLoads = 3
+    private let batchRefreshInterval: TimeInterval = 0.5 // Process queue every 500ms
 
     init() {
         startBackgroundRefresh()
@@ -62,16 +67,19 @@ class ImagePreloader: ObservableObject {
     private func pruneCache() {
         guard loadedImages.count > maxCachedImages else { return }
         
-        // Remove least recently accessed images
+        // Do pruning off main thread to avoid blocking
+        let imagesToRemove = loadedImages.count - maxCachedImages
         let sortedByAccess = cacheAccessTimes.sorted { $0.value < $1.value }
-        let urlsToRemove = sortedByAccess.prefix(loadedImages.count - maxCachedImages).map { $0.key }
+        let urlsToRemove = sortedByAccess.prefix(imagesToRemove).map { $0.key }
         
-        for url in urlsToRemove {
-            loadedImages.removeValue(forKey: url)
-            cacheAccessTimes.removeValue(forKey: url)
+        DispatchQueue.main.async {
+            for url in urlsToRemove {
+                self.loadedImages.removeValue(forKey: url)
+                self.cacheAccessTimes.removeValue(forKey: url)
+            }
+            
+            self.logger.debug("Pruned cache: removed \(urlsToRemove.count) images")
         }
-        
-        logger.debug("Pruned cache: removed \(urlsToRemove.count) images")
     }
     
     private func recordAccess(for url: URL) {
@@ -117,17 +125,59 @@ class ImagePreloader: ObservableObject {
     }
 
     private func startBackgroundRefresh() {
+        // Main refresh cycle - repopulate queue
         timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
-            self?.backgroundRefresh()
+            self?.queueBackgroundRefresh()
+        }
+        
+        // Batch processor - continuously process queue
+        Timer.scheduledTimer(withTimeInterval: batchRefreshInterval, repeats: true) { [weak self] _ in
+            self?.processRefreshQueue()
         }
     }
-
-    private func backgroundRefresh() {
-        for url in urls {
-            loadImage(for: url)
+    
+    /// Queue all images for refresh (called every refreshInterval seconds)
+    private func queueBackgroundRefresh() {
+        // Add all URLs to queue if not already queued
+        let urlsToQueue = urls.filter { url in
+            !refreshQueue.contains(url) && !loading.contains(url)
         }
-        DispatchQueue.main.async {
-            self.lastRefreshed = Date()
+        
+        // Prioritize recently accessed images
+        let sortedUrls = urlsToQueue.sorted { url1, url2 in
+            let time1 = cacheAccessTimes[url1] ?? .distantPast
+            let time2 = cacheAccessTimes[url2] ?? .distantPast
+            return time1 > time2
+        }
+        
+        refreshQueue.append(contentsOf: sortedUrls)
+        
+        if !sortedUrls.isEmpty {
+            logger.debug("Queued \(sortedUrls.count) images for refresh")
+        }
+    }
+    
+    /// Process refresh queue in small batches (called every 500ms)
+    private func processRefreshQueue() {
+        // Only process if we have capacity
+        guard loading.count < maxConcurrentLoads else {
+            return
+        }
+        
+        // Process next batch
+        let availableSlots = maxConcurrentLoads - loading.count
+        let batch = Array(refreshQueue.prefix(availableSlots))
+        
+        if !batch.isEmpty {
+            refreshQueue.removeFirst(batch.count)
+            
+            for url in batch {
+                loadImage(for: url)
+            }
+            
+            DispatchQueue.main.async {
+                self.lastRefreshed = Date()
+            }
         }
     }
 
@@ -136,7 +186,17 @@ class ImagePreloader: ObservableObject {
         
         var request = URLRequest(url: url)
         request.cachePolicy = forceRefresh ? .reloadIgnoringLocalCacheData : .useProtocolCachePolicy
-        request.timeoutInterval = Environment.networkTimeout
+        request.timeoutInterval = AppEnvironment.networkTimeout
+        
+        // Add conditional request headers for efficient 304 responses
+        if !forceRefresh {
+            if let etag = etags[url] {
+                request.setValue(etag, forHTTPHeaderField: "If-None-Match")
+            }
+            if let lastModified = lastModifieds[url] {
+                request.setValue(lastModified, forHTTPHeaderField: "If-Modified-Since")
+            }
+        }
         
         DispatchQueue.main.async {
             if self.hasLoadedOnce.contains(url) {
@@ -165,6 +225,24 @@ class ImagePreloader: ObservableObject {
                 return
             }
             
+            // Handle 304 Not Modified - image unchanged, no work needed!
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 304 {
+                self.logger.debug("Image unchanged (304) for URL: \(url.absoluteString)")
+                
+                MetricsService.shared.track(
+                    event: .imageLoadSuccess,
+                    duration: duration,
+                    tags: ["changed": "false", "cached": "true"]
+                )
+                
+                DispatchQueue.main.async {
+                    self.loading.remove(url)
+                    self.recordAccess(for: url)
+                    self.lastRefreshed = Date()
+                }
+                return
+            }
+            
             guard let data = data, data.count > 100 else {
                 self.logger.warning("Image data for URL \(url.absoluteString) is too small or missing")
                 DispatchQueue.main.async {
@@ -173,6 +251,7 @@ class ImagePreloader: ObservableObject {
                 return
             }
             
+            // Decode image off main thread
             guard let image = UIImage(data: data) else {
                 self.logger.error("Failed to decode image for URL: \(url.absoluteString). Data length: \(data.count)")
                 DispatchQueue.main.async {
@@ -180,6 +259,9 @@ class ImagePreloader: ObservableObject {
                 }
                 return
             }
+            
+            // Force decompression off main thread to avoid stuttering
+            let decompressedImage = image.preparingForDisplay()
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 self.logger.warning("No HTTP response for URL: \(url.absoluteString)")
@@ -215,7 +297,8 @@ class ImagePreloader: ObservableObject {
                 }()
                 
                 let isFirstLoad = !self.hasLoadedOnce.contains(url)
-                self.loadedImages[url] = image
+                // Use decompressed image to avoid UI lag
+                self.loadedImages[url] = decompressedImage ?? image
                 self.recordAccess(for: url)
                 self.lastRefreshed = Date()
                 self.hasLoadedOnce.insert(url)
@@ -239,8 +322,10 @@ class ImagePreloader: ObservableObject {
                 
                 if let newEtag = newEtag { self.etags[url] = newEtag }
                 if let newLastModified = newLastModified { self.lastModifieds[url] = newLastModified }
-                
-                // Prune cache if needed
+            }
+            
+            // Prune cache if needed (do outside main queue to avoid blocking)
+            if self.loadedImages.count > self.maxCachedImages {
                 self.pruneCache()
             }
         }.resume()
