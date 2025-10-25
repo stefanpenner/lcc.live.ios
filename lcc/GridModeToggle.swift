@@ -80,42 +80,7 @@ struct GridModeToggle: View {
             )
         }
         .padding(8)
-        .background(
-            ZStack {
-                // Liquid Glass container
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(.ultraThinMaterial)
-                
-                // Refraction gradient
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.12),
-                                Color.white.opacity(0.04),
-                                Color.clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                
-                // Luminous edge
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.25),
-                                Color.white.opacity(0.05)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1
-                    )
-            }
-            .shadow(color: Color.black.opacity(0.12), radius: 10, y: 4)
-        )
+        .glassBackground(RoundedRectangle(cornerRadius: 14), material: .ultraThinMaterial)
         .padding([.top, .trailing], 8)
     }
 }

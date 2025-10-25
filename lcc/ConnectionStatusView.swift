@@ -26,31 +26,13 @@ struct ConnectionStatusView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(
-            ZStack {
-                // Liquid Glass base
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                
-                // Status-colored refraction
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                statusColor.opacity(0.15),
-                                statusColor.opacity(0.05),
-                                Color.clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                
-                // Luminous edge based on status
-                Capsule()
-                    .stroke(statusColor.opacity(0.3), lineWidth: 1)
-            }
-            .shadow(color: statusColor.opacity(0.2), radius: 6, y: 2)
+        .glassBackground(
+            Capsule(),
+            material: .ultraThinMaterial,
+            tint: statusColor,
+            edgeColor: statusColor,
+            strokeOpacity: 0.30,
+            shadowOpacity: 0.18
         )
         .onTapGesture {
             withAnimation(.spring(response: 0.3)) {

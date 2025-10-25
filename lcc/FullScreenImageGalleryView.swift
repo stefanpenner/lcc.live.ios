@@ -345,10 +345,13 @@ struct FullScreenImageGalleryView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .background(
-                            Capsule()
-                                .fill(Color.black.opacity(0.5))
-                                .background(.ultraThinMaterial, in: Capsule())
+                        .glassBackground(
+                            Capsule(),
+                            material: .ultraThinMaterial,
+                            tint: Color.white,
+                            edgeColor: Color.white,
+                            strokeOpacity: 0.25,
+                            shadowOpacity: 0.14
                         )
                         .padding(.bottom, 50)
                     }
@@ -367,11 +370,14 @@ struct FullScreenImageGalleryView: View {
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
                                 .frame(width: 36, height: 36)
-                                .background(
-                                    Circle()
-                                        .fill(Color.black.opacity(0.5))
-                                        .background(.ultraThinMaterial, in: Circle())
-                                )
+                            .glassBackground(
+                                Circle(),
+                                material: .ultraThinMaterial,
+                                tint: Color.white,
+                                edgeColor: Color.white,
+                                strokeOpacity: 0.25,
+                                shadowOpacity: 0.14
+                            )
                         }
                         .padding()
                         .accessibilityLabel("Close")
@@ -390,10 +396,13 @@ struct FullScreenImageGalleryView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
-                        .background(
-                            Capsule()
-                                .fill(Color.black.opacity(0.5))
-                                .background(.ultraThinMaterial, in: Capsule())
+                        .glassBackground(
+                            Capsule(),
+                            material: .ultraThinMaterial,
+                            tint: Color.white,
+                            edgeColor: Color.white,
+                            strokeOpacity: 0.25,
+                            shadowOpacity: 0.14
                         )
                         .padding(.top, 12)
                     Spacer()

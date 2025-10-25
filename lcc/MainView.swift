@@ -265,7 +265,7 @@ struct MainView: View {
             } else {
                 // Bottom floating GridModeToggle
                 GridModeToggle(
-                    gridMode: $gridMode,
+                    gridMode: $gridMode
                 )
                 .frame(width: geometry.size.width)
                 .position(x: geometry.size.width / 2, y: geometry.size.height - 50)

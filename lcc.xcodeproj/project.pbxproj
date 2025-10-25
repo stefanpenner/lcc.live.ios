@@ -25,8 +25,8 @@
 
 /* Begin PBXFileReference section */
 		E21BA5B12DC2C9F9008638D3 /* lcc.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = lcc.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E21BA5C12DC2C9F9008638D3 /* lccTests.xclcc */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = lccTests.xclcc; sourceTree = BUILT_PRODUCTS_DIR; };
-		E21BA5CB2DC2C9F9008638D3 /* lccUITests.xclcc */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = lccUITests.xclcc; sourceTree = BUILT_PRODUCTS_DIR; };
+        E21BA5C12DC2C9F9008638D3 /* lccTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = lccTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+        E21BA5CB2DC2C9F9008638D3 /* lccUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = lccUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -86,8 +86,8 @@
 			isa = PBXGroup;
 			children = (
 				E21BA5B12DC2C9F9008638D3 /* lcc.app */,
-				E21BA5C12DC2C9F9008638D3 /* lccTests.xclcc */,
-				E21BA5CB2DC2C9F9008638D3 /* lccUITests.xclcc */,
+                E21BA5C12DC2C9F9008638D3 /* lccTests.xctest */,
+                E21BA5CB2DC2C9F9008638D3 /* lccUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -137,8 +137,8 @@
 			packageProductDependencies = (
 			);
 			productName = lccTests;
-			productReference = E21BA5C12DC2C9F9008638D3 /* lccTests.xclcc */;
-			productType = "com.apple.product-type.bundle.unit-lcc";
+            productReference = E21BA5C12DC2C9F9008638D3 /* lccTests.xctest */;
+            productType = "com.apple.product-type.bundle.unit-test";
 		};
 		E21BA5CA2DC2C9F9008638D3 /* lccUITests */ = {
 			isa = PBXNativeTarget;
@@ -160,8 +160,8 @@
 			packageProductDependencies = (
 			);
 			productName = lccUITests;
-			productReference = E21BA5CB2DC2C9F9008638D3 /* lccUITests.xclcc */;
-			productType = "com.apple.product-type.bundle.ui-lccing";
+            productReference = E21BA5CB2DC2C9F9008638D3 /* lccUITests.xctest */;
+            productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 

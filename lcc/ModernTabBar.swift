@@ -34,35 +34,13 @@ struct ModernTabBar: View {
                     }
                     .padding(.vertical, 8)
                     .padding(.horizontal, 18)
-                    .background(
-                        ZStack {
-                            if selectedTab == idx {
-                                // Active: Liquid Glass with accent vibrancy
-                                Capsule()
-                                    .fill(.thinMaterial)
-                                
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color.accentColor.opacity(0.5),
-                                                Color.accentColor.opacity(0.3)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                
-                                // Luminous edge
-                                Capsule()
-                                    .stroke(Color.accentColor.opacity(0.4), lineWidth: 1.5)
-                            } else {
-                                // Inactive: Subtle glass
-                                Capsule()
-                                    .fill(.ultraThinMaterial)
-                                    .opacity(0.6)
-                            }
-                        }
+                    .glassBackground(
+                        Capsule(),
+                        material: selectedTab == idx ? .thinMaterial : .ultraThinMaterial,
+                        tint: selectedTab == idx ? Color.accentColor : nil,
+                        edgeColor: selectedTab == idx ? Color.accentColor : nil,
+                        strokeOpacity: selectedTab == idx ? 0.45 : 0.20,
+                        shadowOpacity: selectedTab == idx ? 0.16 : 0.10
                     )
                     .animation(.spring(response: 0.4, dampingFraction: 0.7), value: selectedTab)
                     }
@@ -76,43 +54,7 @@ struct ModernTabBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background(
-            ZStack {
-                // Liquid Glass: Ultra-thin material with depth
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                
-                // Refraction effect: Subtle gradient overlay
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.15),
-                                Color.white.opacity(0.05),
-                                Color.clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                
-                // Reflection highlight
-                Capsule()
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.3),
-                                Color.white.opacity(0.05),
-                                Color.clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1
-                    )
-            }
-            .shadow(color: Color.black.opacity(0.15), radius: 12, y: 4)
-        )
+        .glassBackground(Capsule(), material: .ultraThinMaterial)
         .padding(.bottom, 24)
         .padding(.horizontal, 32)
         .frame(maxWidth: 480)

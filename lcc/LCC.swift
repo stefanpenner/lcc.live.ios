@@ -8,8 +8,7 @@
 import SwiftUI
 
 @main
-struct LCC
-: App {
+struct LCC: App {
     @StateObject private var apiService = APIService()
     @StateObject private var preloader = ImagePreloader()
     @StateObject private var networkMonitor = NetworkMonitor.shared
