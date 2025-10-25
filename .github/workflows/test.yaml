@@ -1,0 +1,56 @@
+name: iOS Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    name: Run iOS Unit & UI Tests
+    runs-on: macos-14
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        simulator: ["iPhone 16 Pro Max"]
+        os: ["18.4"]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.0'
+
+      - name: Verify Xcode Version
+        run: |
+          xcodebuild -version
+
+      - name: List Available Simulators
+        run: |
+          xcrun simctl list devices available
+
+      - name: Run Tests
+        run: |
+          set -euo pipefail
+          xcodebuild clean test \
+            -project lcc.xcodeproj \
+            -scheme lcc \
+            -destination "platform=iOS Simulator,name=${{ matrix.simulator }},OS=${{ matrix.os }}" \
+            -enableCodeCoverage YES \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty --test --color
+        env:
+          NSUnbufferedIO: "YES"
+
+      - name: Collect Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresults-${{ matrix.simulator }}-${{ matrix.os }}
+          path: |
+            **/*.xcresult
+            ~/Library/Developer/Xcode/DerivedData/**/Logs/Test/*.xcactivitylog
