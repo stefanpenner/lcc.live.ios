@@ -14,7 +14,9 @@ struct YouTubePlayerView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
-        configuration.mediaTypesRequiringUserActionForPlayback = autoplay ? [] : .all
+        configuration.allowsAirPlayForMediaPlayback = true
+        configuration.allowsPictureInPictureMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []  // Allow autoplay
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.scrollView.isScrollEnabled = false
@@ -25,74 +27,33 @@ struct YouTubePlayerView: UIViewRepresentable {
     }
     
     func updateUIView(_ webView: WKWebView, context: Context) {
-        // Build the embed URL with parameters
-        var urlString = embedURL
+        // Use youtube-nocookie.com domain for better compatibility and privacy
+        var urlString = embedURL.replacingOccurrences(of: "youtube.com", with: "youtube-nocookie.com")
         
-        // Add autoplay parameter if needed
+        // Build parameters
+        var params: [String] = []
+        
+        // Autoplay
         if autoplay {
-            urlString += embedURL.contains("?") ? "&autoplay=1&mute=1" : "?autoplay=1&mute=1"
+            params.append("autoplay=1")
+            params.append("mute=1")
         }
         
-        // Add other useful parameters
-        let params = [
-            "playsinline=1",           // Play inline on iOS
-            "rel=0",                    // Don't show related videos
-            "modestbranding=1",         // Minimal YouTube branding
-            "controls=1",               // Show player controls
-            "showinfo=0",               // Hide video info
-            "enablejsapi=1"             // Enable JavaScript API
-        ]
+        // Essential parameters for iOS playback
+        params.append("playsinline=1")      // Play inline on iOS
+        params.append("controls=1")          // Show player controls
+        params.append("rel=0")               // Don't show related videos
+        params.append("modestbranding=1")    // Minimal YouTube branding
         
-        for param in params {
-            urlString += urlString.contains("?") ? "&\(param)" : "?\(param)"
-        }
+        // Append parameters to URL
+        let separator = urlString.contains("?") ? "&" : "?"
+        let paramString = params.joined(separator: "&")
+        urlString += separator + paramString
         
-        // Wrap in proper HTML with responsive iframe
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <style>
-                * {
-                    margin: 0;
-                    padding: 0;
-                    border: 0;
-                }
-                html, body {
-                    width: 100%;
-                    height: 100%;
-                    background-color: #000;
-                    overflow: hidden;
-                }
-                .video-container {
-                    position: relative;
-                    width: 100%;
-                    height: 100%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                iframe {
-                    width: 100%;
-                    height: 100%;
-                    border: none;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="video-container">
-                <iframe src="\(urlString)" 
-                        frameborder="0" 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                        allowfullscreen>
-                </iframe>
-            </div>
-        </body>
-        </html>
-        """
-        
-        webView.loadHTMLString(html, baseURL: URL(string: "https://www.youtube.com"))
+        // Load directly via URLRequest (more reliable than HTML wrapper)
+        guard let url = URL(string: urlString) else { return }
+        let request = URLRequest(url: url)
+        webView.load(request)
     }
 }
 

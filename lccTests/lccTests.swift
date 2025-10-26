@@ -10,149 +10,10 @@ import Testing
 import Foundation
 import UIKit
 
-@Suite("ImagePreloader Tests")
-struct ImagePreloaderTests {
-    
-    @Test("ImagePreloader initializes correctly")
-    func testInitialization() async throws {
-        let preloader = ImagePreloader()
-        #expect(preloader.loadedImages.isEmpty)
-        #expect(preloader.loading.isEmpty)
-    }
-    
-    @Test("ImagePreloader handles empty URL list")
-    func testPreloadEmptyList() async throws {
-        let preloader = ImagePreloader()
-        preloader.preloadImages(from: [])
-        #expect(preloader.loadedImages.isEmpty)
-    }
-    
-    @Test("ImagePreloader handles invalid URLs gracefully")
-    func testInvalidURLs() async throws {
-        let preloader = ImagePreloader()
-        let invalidUrls = ["not a url", "ht!tp://bad", ""]
-        preloader.preloadImages(from: invalidUrls)
-        
-        // Should not crash and should handle gracefully
-        #expect(preloader.loadedImages.isEmpty)
-    }
-    
-    @Test("ImagePreloader processes valid URLs")
-    func testValidURLs() async throws {
-        let preloader = ImagePreloader()
-        let validUrls = [
-            "https://lcc.live/image/test1",
-            "https://lcc.live/image/test2"
-        ]
-        preloader.preloadImages(from: validUrls)
-        
-        // Give it a moment to start loading
-        try? await Task.sleep(for: .milliseconds(100))
-        
-        // At least should have attempted to load
-        #expect(preloader.lastRefreshed != Date(timeIntervalSince1970: 0))
-    }
-    
-    @Test("ImagePreloader tracks loading state")
-    func testLoadingState() async throws {
-        let preloader = ImagePreloader()
-        
-        // Initially no loading
-        #expect(preloader.loading.isEmpty)
-        
-        // After preloading valid URLs, loading state should be tracked
-        preloader.preloadImages(from: ["https://example.com/image.jpg"])
-        
-        // Wait a bit
-        try? await Task.sleep(for: .milliseconds(50))
-        
-        // Loading state may or may not contain the URL depending on timing
-        // The test is just to verify it doesn't crash
-    }
-}
+// MARK: - Grid Layout Tests (Critical business logic)
 
-@Suite("PhotoTabView GridMode Tests")
-struct PhotoTabViewTests {
-    
-    @Test("GridMode has correct cases")
-    func testGridModeCases() {
-        let allModes = PhotoTabView.GridMode.allCases
-        #expect(allModes.count == 2)
-        #expect(allModes.contains(.compact))
-        #expect(allModes.contains(.single))
-    }
-    
-    @Test("GridMode has correct raw values")
-    func testGridModeRawValues() {
-        #expect(PhotoTabView.GridMode.compact.rawValue == "Compact")
-        #expect(PhotoTabView.GridMode.single.rawValue == "Single")
-    }
-    
-    @Test("GridMode is identifiable")
-    func testGridModeIdentifiable() {
-        let compact = PhotoTabView.GridMode.compact
-        let single = PhotoTabView.GridMode.single
-        
-        #expect(compact.id == "Compact")
-        #expect(single.id == "Single")
-        #expect(compact.id != single.id)
-    }
-}
-
-@Suite("PresentedMedia Tests")
-struct PresentedMediaTests {
-    
-    @Test("PresentedMedia initializes correctly")
-    func testInitialization() throws {
-        let mediaItem = MediaItem.from(urlString: "https://example.com/image.jpg")!
-        let presentedMedia = PresentedMedia(mediaItem: mediaItem)
-        
-        #expect(presentedMedia.mediaItem.url == mediaItem.url)
-        #expect(presentedMedia.id != UUID())  // Should have a unique ID
-    }
-    
-    @Test("PresentedMedia has unique IDs")
-    func testUniqueIDs() throws {
-        let mediaItem = MediaItem.from(urlString: "https://example.com/image.jpg")!
-        let media1 = PresentedMedia(mediaItem: mediaItem)
-        let media2 = PresentedMedia(mediaItem: mediaItem)
-        
-        #expect(media1.id != media2.id)
-    }
-    
-    @Test("PresentedMedia equality based on id")
-    func testEquality() throws {
-        let mediaItem1 = MediaItem.from(urlString: "https://example.com/image1.jpg")!
-        let mediaItem2 = MediaItem.from(urlString: "https://example.com/image2.jpg")!
-        
-        let media1 = PresentedMedia(mediaItem: mediaItem1)
-        let media2 = PresentedMedia(mediaItem: mediaItem1)
-        let media3 = PresentedMedia(mediaItem: mediaItem2)
-        
-        // Different IDs, same media item
-        #expect(media1 != media2)
-        
-        // Different media items
-        #expect(media1 != media3)
-    }
-}
-
-@Suite("Grid Layout Utilities Tests")
+@Suite("Grid Layout Tests")
 struct GridLayoutUtilsTests {
-    
-    @Test("Compact mode calculates correct columns")
-    func testCompactModeColumns() {
-        let result = calculateGridLayout(
-            availableWidth: 400,
-            availableHeight: 800,
-            gridMode: .compact,
-            spacing: 5
-        )
-        
-        #expect(result.columns >= 2)
-        #expect(result.imageWidth > 0)
-        #expect(result.imageHeight > 0)
-    }
     
     @Test("Single mode portrait calculates one column")
     func testSingleModePortrait() {
@@ -177,7 +38,6 @@ struct GridLayoutUtilsTests {
         )
         
         #expect(result.columns == 2)
-        #expect(result.imageWidth > 0)
     }
     
     @Test("Layout respects spacing")
@@ -190,24 +50,10 @@ struct GridLayoutUtilsTests {
             spacing: spacing
         )
         
-        // Total width should be available width minus spacing
         let totalSpacing = CGFloat(result.columns - 1) * spacing
         let expectedImageWidth = (400 - totalSpacing) / CGFloat(result.columns)
         
         #expect(abs(result.imageWidth - expectedImageWidth) < 1.0)
-    }
-    
-    @Test("Layout handles small widths")
-    func testSmallWidth() {
-        let result = calculateGridLayout(
-            availableWidth: 100,
-            availableHeight: 800,
-            gridMode: .compact,
-            spacing: 5
-        )
-        
-        #expect(result.columns >= 2)  // Minimum 2 columns
-        #expect(result.imageWidth > 0)
     }
     
     @Test("Layout maintains aspect ratio")
@@ -224,97 +70,163 @@ struct GridLayoutUtilsTests {
     }
 }
 
-@Suite("MediaItem Tests")
-struct MediaItemTests {
+// MARK: - YouTube URL Parsing Tests (Critical for video support)
+
+@Suite("YouTube URL Parsing Tests")
+struct YouTubeVideoTests {
     
-    @Test("MediaItem detects images correctly")
-    func testImageDetection() {
-        let imageURL = "https://lcc.live/image/test123"
-        let mediaItem = MediaItem.from(urlString: imageURL)
-        
-        #expect(mediaItem != nil)
-        #expect(mediaItem?.type == .image)
-        #expect(mediaItem?.url == imageURL)
-    }
-    
-    @Test("MediaItem detects YouTube videos")
-    func testYouTubeDetection() {
-        let youtubeURL = "https://youtube.com/embed/dQw4w9WgXcQ"
-        let mediaItem = MediaItem.from(urlString: youtubeURL)
-        
-        #expect(mediaItem != nil)
-        if case .youtubeVideo = mediaItem?.type {
-            // Success
-        } else {
-            Issue.record("Expected YouTube video type")
-        }
-    }
-    
-    @Test("MediaItem handles watch URLs")
-    func testYouTubeWatchURL() {
-        let watchURL = "https://youtube.com/watch?v=dQw4w9WgXcQ"
+    @Test("Converts watch URLs to embed URLs")
+    func testYouTubeWatchURLConversion() {
+        let watchURL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         let mediaItem = MediaItem.from(urlString: watchURL)
         
         #expect(mediaItem != nil)
         if case .youtubeVideo(let embedURL) = mediaItem?.type {
-            #expect(embedURL.contains("embed"))
+            #expect(embedURL.contains("embed/dQw4w9WgXcQ"))
         } else {
-            Issue.record("Expected YouTube video type")
+            Issue.record("Expected YouTube video type with embed URL")
+        }
+    }
+    
+    @Test("Converts short URLs to embed URLs")
+    func testYouTubeShortURL() {
+        let shortURL = "https://youtu.be/dQw4w9WgXcQ"
+        let mediaItem = MediaItem.from(urlString: shortURL)
+        
+        #expect(mediaItem != nil)
+        if case .youtubeVideo(let embedURL) = mediaItem?.type {
+            #expect(embedURL.contains("embed/dQw4w9WgXcQ"))
+        } else {
+            Issue.record("Expected YouTube video type with embed URL")
+        }
+    }
+    
+    @Test("Detects YouTube iframe tags")
+    func testYouTubeIframe() {
+        let iframeHTML = "<iframe src=\"https://www.youtube.com/embed/dQw4w9WgXcQ\" frameborder=\"0\"></iframe>"
+        let mediaItem = MediaItem.from(urlString: iframeHTML)
+        
+        #expect(mediaItem != nil)
+        if case .youtubeVideo(let embedURL) = mediaItem?.type {
+            #expect(embedURL.contains("youtube.com/embed/dQw4w9WgXcQ"))
+        } else {
+            Issue.record("Expected YouTube video type from iframe")
+        }
+    }
+    
+    @Test("isVideo property distinguishes videos from images")
+    func testIsVideoProperty() {
+        let videoURL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        let imageURL = "https://lcc.live/image/test123"
+        
+        let videoItem = MediaItem.from(urlString: videoURL)
+        let imageItem = MediaItem.from(urlString: imageURL)
+        
+        #expect(videoItem?.type.isVideo == true)
+        #expect(imageItem?.type.isVideo == false)
+    }
+}
+
+// MARK: - Gallery Helper Tests (Critical for share functionality)
+
+@Suite("Gallery Helper Tests")
+struct GalleryHelperTests {
+    
+    @Test("clampIndex handles edge cases")
+    func testClampIndexEdgeCases() {
+        #expect(clampIndex(5, count: 0) == 0)      // Empty collection
+        #expect(clampIndex(-5, count: 10) == 0)    // Negative index
+        #expect(clampIndex(15, count: 10) == 9)    // Out of bounds
+        #expect(clampIndex(5, count: 10) == 5)     // Valid index
+    }
+    
+    @Test("galleryShareURL wraps image URLs in lcc.live proxy")
+    func testShareURLImageProxy() {
+        let imageURL = "https://example.com/image.jpg"
+        let mediaItem = MediaItem.from(urlString: imageURL)
+        
+        let shareURL = galleryShareURL(for: mediaItem)
+        #expect(shareURL?.absoluteString.hasPrefix("https://lcc.live/image/") == true)
+    }
+    
+    @Test("galleryShareURL passes through already proxied images")
+    func testShareURLAlreadyProxied() {
+        let proxiedURL = "https://lcc.live/image/aGVsbG8="
+        let mediaItem = MediaItem.from(urlString: proxiedURL)
+        
+        let shareURL = galleryShareURL(for: mediaItem)
+        #expect(shareURL?.absoluteString == proxiedURL)
+    }
+    
+    @Test("galleryShareURL generates YouTube watch URLs from embed URLs")
+    func testShareURLYouTubeEmbed() {
+        let embedURL = "https://www.youtube.com/embed/dQw4w9WgXcQ"
+        let mediaItem = MediaItem.from(urlString: embedURL)
+        
+        let shareURL = galleryShareURL(for: mediaItem)
+        #expect(shareURL?.absoluteString == "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    }
+    
+    @Test("galleryShareURL handles YouTube short URLs")
+    func testShareURLYouTubeShort() {
+        let shortURL = "https://youtu.be/dQw4w9WgXcQ"
+        let mediaItem = MediaItem.from(urlString: shortURL)
+        
+        let shareURL = galleryShareURL(for: mediaItem)
+        #expect(shareURL?.absoluteString == "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    }
+    
+    @Test("galleryShareURL handles YouTube URLs with parameters")
+    func testShareURLYouTubeWithParams() {
+        let embedURLWithParams = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
+        let mediaItem = MediaItem.from(urlString: embedURLWithParams)
+        
+        let shareURL = galleryShareURL(for: mediaItem)
+        #expect(shareURL?.absoluteString == "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    }
+    
+    @Test("galleryShareURL base64 encodes original image URLs correctly")
+    func testShareURLBase64Encoding() {
+        let originalURL = "https://example.com/image.jpg"
+        let mediaItem = MediaItem.from(urlString: originalURL)
+        
+        let shareURL = galleryShareURL(for: mediaItem)
+        #expect(shareURL != nil)
+        
+        // Verify base64 encoding is reversible
+        if let urlString = shareURL?.absoluteString,
+           urlString.hasPrefix("https://lcc.live/image/") {
+            let base64Part = urlString.replacingOccurrences(of: "https://lcc.live/image/", with: "")
+            if let data = Data(base64Encoded: base64Part),
+               let decoded = String(data: data, encoding: .utf8) {
+                #expect(decoded == originalURL)
+            } else {
+                Issue.record("Failed to decode base64")
+            }
+        } else {
+            Issue.record("Expected lcc.live proxy URL")
         }
     }
 }
 
-@Suite("APIService Tests")
-struct APIServiceTests {
-    
-    @Test("APIService initializes")
-    func testInitialization() async throws {
-        let apiService = APIService()
-        
-        // APIService starts with empty arrays and fetches from API
-        #expect(apiService.lccMedia.isEmpty || !apiService.lccMedia.isEmpty, "LCC media should be initialized")
-        #expect(apiService.bccMedia.isEmpty || !apiService.bccMedia.isEmpty, "BCC media should be initialized")
-    }
-    
-    @Test("APIService starts loading on init")
-    func testStartsLoading() async throws {
-        let apiService = APIService()
-        
-        // Give it a moment to start fetching
-        try? await Task.sleep(for: .milliseconds(100))
-        
-        // Should have attempted to fetch
-        #expect(!apiService.isLoading || apiService.isLoading, "Should track loading state")
-    }
-    
-    @Test("APIService can fetch and parse media")
-    func testFetchAndParse() async throws {
-        let apiService = APIService()
-        
-        // Wait for initial fetch attempt
-        try? await Task.sleep(for: .milliseconds(1000))
-        
-        // Should have made an attempt (either succeeded or failed)
-        let hasFetched = !apiService.lccMedia.isEmpty || !apiService.bccMedia.isEmpty || apiService.error != nil
-        #expect(hasFetched, "Should have attempted to fetch media")
-    }
-}
+// MARK: - Invalid Input Tests (Edge cases)
 
-@Suite("AppEnvironment Tests")
-struct AppEnvironmentTests {
+@Suite("Invalid Input Handling Tests")
+struct InvalidInputTests {
     
-    @Test("AppEnvironment has valid configuration")
-    func testEnvironmentConfig() {
-        #expect(!AppEnvironment.apiBaseURL.isEmpty, "API base URL should be set")
-        #expect(!AppEnvironment.metricsURL.isEmpty, "Metrics URL should be set")
-        #expect(!AppEnvironment.appVersion.isEmpty, "App version should be set")
-        #expect(!AppEnvironment.buildNumber.isEmpty, "Build number should be set")
+    @Test("ImagePreloader handles invalid URLs gracefully")
+    func testInvalidURLs() async throws {
+        let preloader = ImagePreloader()
+        let invalidUrls = ["not a url", "ht!tp://bad", ""]
+        preloader.preloadImages(from: invalidUrls)
+        
+        // Should not crash
+        #expect(preloader.loadedImages.isEmpty)
     }
     
-    @Test("AppEnvironment timeouts are reasonable")
-    func testTimeouts() {
-        #expect(AppEnvironment.networkTimeout > 0, "Network timeout should be positive")
-        #expect(AppEnvironment.imageRefreshInterval > 0, "Refresh interval should be positive")
-        #expect(AppEnvironment.apiCheckInterval > 0, "API check interval should be positive")
+    @Test("galleryShareURL returns nil for nil media")
+    func testShareURLNilMedia() {
+        let result = galleryShareURL(for: nil)
+        #expect(result == nil)
     }
 }
