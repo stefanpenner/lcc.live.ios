@@ -131,6 +131,7 @@ struct MainView: View {
                 .offset(x: -CGFloat(selectedTab) * geometry.size.width + dragOffset)
                 .allowsHitTesting(!isAnyFullScreen)
                 .ignoresSafeArea(edges: [.top, .bottom, .leading, .trailing])
+                .clipped()
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 20)
                         .onChanged { value in
@@ -287,8 +288,7 @@ struct MainView: View {
             }
             }
             .background(Color.black)
-            .edgesIgnoringSafeArea(.all)
-            .clipped() // Prevent adjacent screens from showing through edges
+            .ignoresSafeArea(edges: .all)
         }
         .overlay(alignment: .top) {
             if fullScreenMedia == nil {

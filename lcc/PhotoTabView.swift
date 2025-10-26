@@ -38,6 +38,7 @@ struct PhotoTabView: View {
     var body: some View {
         GeometryReader { geometry in
             let availableWidth = geometry.size.width
+            let availableHeight = geometry.size.height
             let columns = gridMode == .single ? 1 : max(1, Int(availableWidth / 180))
             let imageWidth = (availableWidth - CGFloat(columns - 1) * spacing) / CGFloat(columns)
             let imageHeight = imageWidth * (gridMode == .single ? 0.9 : 0.9)
@@ -52,15 +53,10 @@ struct PhotoTabView: View {
                                 // Only show empty state after we've received API response
                                 if hasReceivedInitialPayload {
                                     EmptyStateView()
-                                        .frame(width: availableWidth, height: geometry.size.height * 0.6)
+                                        .frame(width: availableWidth, height: availableHeight * 0.6)
                                 }
                             } else {
                             LazyVGrid(columns: gridItems, spacing: spacing) {
-                                // Minimal top spacer - content starts behind island
-                                Color.clear
-                                    .frame(height: 0)
-                                    .gridCellColumns(columns)
-                                
                                 ForEach(mediaItems, id: \.id) { mediaItem in
                                     MediaCell(
                                         mediaItem: mediaItem,
@@ -87,6 +83,7 @@ struct PhotoTabView: View {
                             .frame(maxWidth: .infinity)
                         }
                     }
+                    .frame(minHeight: availableHeight)
                 }
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 20)
@@ -124,9 +121,9 @@ struct PhotoTabView: View {
                 .refreshable {
                     await performRefresh()
                 }
-                .ignoresSafeArea(edges: .all)
                 .scrollContentBackground(.hidden)
-                .background(Color.black)
+                .background(ScrollViewConfigurator())
+                .ignoresSafeArea(edges: .all)
                 .modifier(ZeroScrollContentMarginsIfAvailable())
                 
                 // Unified loading overlay during initial load
@@ -141,6 +138,7 @@ struct PhotoTabView: View {
                     .transition(.opacity)
                 }
             }
+            .ignoresSafeArea(edges: .all)
         }
         .onAppear {
             logger.info("📱 PhotoTabView appeared with \(mediaItems.count) media items")
@@ -609,6 +607,47 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+// Helper to find and configure UIScrollView to remove insets
+struct ScrollViewConfigurator: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        
+        // Delay to let SwiftUI create the ScrollView
+        DispatchQueue.main.async {
+            self.configureScrollView(in: view)
+        }
+        
+        return view
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {
+        configureScrollView(in: uiView)
+    }
+    
+    private func configureScrollView(in view: UIView) {
+        // Find UIScrollView by traversing the view hierarchy
+        var responder: UIResponder? = view
+        while responder != nil {
+            if let scrollView = responder as? UIScrollView {
+                // Configure to remove insets and make background transparent
+                scrollView.backgroundColor = .clear
+                scrollView.contentInsetAdjustmentBehavior = .never
+                
+                // Zero content insets to allow content to fill naturally
+                scrollView.contentInset = .zero
+                scrollView.scrollIndicatorInsets = .zero
+                
+                if #available(iOS 13.0, *) {
+                    scrollView.automaticallyAdjustsScrollIndicatorInsets = false
+                }
+                break
+            }
+            responder = responder?.next
+        }
     }
 }
 

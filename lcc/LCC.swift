@@ -38,6 +38,7 @@ struct LCC: App {
                 .environmentObject(apiService)
                 .environmentObject(preloader)
                 .environmentObject(networkMonitor)
+                .background(Color.black.ignoresSafeArea(.all))
         }
     }
 }
