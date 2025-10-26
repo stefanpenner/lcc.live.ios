@@ -212,41 +212,7 @@ struct MainView: View {
                     resetUIControlsTimer()
                 }
             
-            // Edge-to-edge blur overlays for depth
-            if fullScreenMedia == nil {
-                VStack(spacing: 0) {
-                    // Top blur gradient
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: Color.black.opacity(0.4), location: 0.0),
-                            .init(color: Color.black.opacity(0.2), location: 0.3),
-                            .init(color: Color.clear, location: 1.0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 120)
-                    .blur(radius: 8)
-                    
-                    Spacer()
-                    
-                    // Bottom blur gradient
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: Color.clear, location: 0.0),
-                            .init(color: Color.black.opacity(0.2), location: 0.7),
-                            .init(color: Color.black.opacity(0.4), location: 1.0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 120)
-                    .blur(radius: 8)
-                }
-                .ignoresSafeArea(edges: .all)
-                .allowsHitTesting(false)
-                .zIndex(1.4)
-            }
+            // fades moved to overlay modifiers pinned to device edges
             
             // Overlay the fullscreen media if needed
             if let presented = fullScreenMedia {
@@ -264,15 +230,8 @@ struct MainView: View {
                 .transition(.opacity)
                 .zIndex(3)
             } else {
-                // Bottom floating GridModeToggle
-                GridModeToggle(
-                    gridMode: $gridMode
-                )
-                .frame(width: geometry.size.width)
-                .position(x: geometry.size.width / 2, y: geometry.size.height - 50)
-                .opacity(showUIControls ? 1 : 0)
-                .animation(.easeOut(duration: 0.3), value: showUIControls)
-                .zIndex(2)
+
+                // Removed tap shield to allow lists/grids to scroll normally
                 
                 // Invisible tap area at top to show controls when hidden
                 if !showUIControls {
@@ -290,20 +249,38 @@ struct MainView: View {
             .background(Color.black)
             .ignoresSafeArea(edges: .all)
         }
+        // Top overlay menu removed (tabs moved to unified bottom bar)
         .overlay(alignment: .top) {
+            // Top fade pinned to device edge
+            LinearGradient(
+                gradient: Gradient(stops: [
+                    .init(color: Color.black.opacity(0.7), location: 0.0),
+                    .init(color: Color.black.opacity(0.35), location: 0.22),
+                    .init(color: Color.clear, location: 1.0)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 140)
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
+        }
+        // Bottom bar now uses native toolbar for default sizing/positioning
+        .toolbar {
             if fullScreenMedia == nil {
-                ModernTabBar(
-                    tabs: ["LCC", "BCC"],
-                    selectedTab: $selectedTab,
-                    showConnectionDetails: $showConnectionDetails
-                )
-                .frame(height: tabBarHeight)
-                .padding(.top, isLandscape ? 12 : 4)
-                .opacity(showUIControls ? 1 : 0)
-                .offset(y: showUIControls ? 0 : -10)
-                .animation(.easeOut(duration: 0.3), value: showUIControls)
+                ToolbarItem(placement: .bottomBar) {
+                    UnifiedBottomBarToolbar(
+                        tabs: ["LCC", "BCC"],
+                        selectedTab: $selectedTab,
+                        gridMode: $gridMode,
+                        showConnectionDetails: $showConnectionDetails
+                    )
+                    .opacity(showUIControls ? 1 : 0)
+                    .animation(.easeOut(duration: 0.3), value: showUIControls)
+                }
             }
         }
+        .toolbarBackground(.visible, for: .bottomBar)
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .onChange(of: selectedTab) {
             refreshImagesTrigger += 1

@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 
+@available(iOS 26.0, *)
 struct FullScreenImageView: View {
     let url: URL
     @EnvironmentObject var preloader: ImagePreloader
@@ -29,16 +30,41 @@ struct FullScreenImageView: View {
                     if let image = preloader.loadedImages[url] {
                         ZoomableDismissableImageView(image: image, geometry: geometry, onFlickDismiss: onFlickDismiss, onZoomChanged: nil)
                     } else if preloader.loading.contains(url) {
-                        ProgressView()
-                            .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.2)
+                            
+                            Text("Loading...")
+                                .foregroundColor(.white.opacity(0.8))
+                                .font(.caption)
+                        }
+                        .padding()
+                        .liquidGlass(
+                            tint: Color.white.opacity(0.1),
+                            in: RoundedRectangle(cornerRadius: 20)
+                        )
+                        .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
                     } else {
-                        VStack {
+                        VStack(spacing: 16) {
                             Image(systemName: "exclamationmark.triangle")
                                 .font(.system(size: 40))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.white.opacity(0.8))
                             Text("Image failed to load")
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.white.opacity(0.8))
+                                .font(.headline)
+                            
+                            Button("Retry") {
+                                preloader.retryImage(for: url)
+                            }
+                            .buttonStyle(.liquidGlass())
+                            .foregroundColor(.white)
                         }
+                        .padding()
+                        .liquidGlass(
+                            tint: Color.red.opacity(0.2),
+                            in: RoundedRectangle(cornerRadius: 20)
+                        )
                         .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
                     }
                 }

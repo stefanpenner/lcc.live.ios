@@ -137,6 +137,37 @@ struct PhotoTabView: View {
                     .ignoresSafeArea()
                     .transition(.opacity)
                 }
+
+                // Fades pinned to device edges using overlay alignment so they reach the very top/bottom
+                Color.clear
+                    .overlay(alignment: .top) {
+                        LinearGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: Color.black.opacity(0.7), location: 0.0),
+                                .init(color: Color.black.opacity(0.35), location: 0.22),
+                                .init(color: Color.clear, location: 1.0)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 140)
+                        .ignoresSafeArea(edges: .top)
+                    }
+                    .overlay(alignment: .bottom) {
+                        LinearGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: Color.clear, location: 0.0),
+                                .init(color: Color.black.opacity(0.4), location: 0.88),
+                                .init(color: Color.black.opacity(0.9), location: 1.0)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 220)
+                        .ignoresSafeArea(edges: .bottom)
+                        .offset(y: 60) // start further offscreen for seamless fade
+                    }
+                    .allowsHitTesting(false)
             }
             .ignoresSafeArea(edges: .all)
         }

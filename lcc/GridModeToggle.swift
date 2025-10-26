@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 26.0, *)
 private struct ToggleButton: View {
     var mode: PhotoTabView.GridMode
     @Binding var currentMode: PhotoTabView.GridMode
@@ -20,32 +21,10 @@ private struct ToggleButton: View {
                 .font(.system(size: 20, weight: .medium))
                 .foregroundColor(isSelected ? .accentColor : .secondary)
                 .frame(width: 44, height: 44)
-                .background(
-                    ZStack {
-                        if isSelected {
-                            // Active: Liquid Glass with accent glow
-                            Circle()
-                                .fill(.thinMaterial)
-                            
-                            Circle()
-                                .fill(
-                                    RadialGradient(
-                                        colors: [
-                                            Color.accentColor.opacity(0.4),
-                                            Color.accentColor.opacity(0.2),
-                                            Color.accentColor.opacity(0.05)
-                                        ],
-                                        center: .center,
-                                        startRadius: 0,
-                                        endRadius: 22
-                                    )
-                                )
-                            
-                            Circle()
-                                .stroke(Color.accentColor.opacity(0.5), lineWidth: 1.5)
-                                .shadow(color: Color.accentColor.opacity(0.3), radius: 6, y: 2)
-                        }
-                    }
+                .liquidGlass(
+                    tint: isSelected ? Color.accentColor : nil,
+                    in: Circle(),
+                    isInteractive: true
                 )
                 .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isSelected)
         }
@@ -56,32 +35,35 @@ private struct ToggleButton: View {
     }
 }
 
+@available(iOS 26.0, *)
 struct GridModeToggle: View {
     @Binding var gridMode: PhotoTabView.GridMode
 
     var body: some View {
-        HStack(spacing: 8) {
-            ToggleButton(
-                mode: .compact,
-                currentMode: $gridMode,
-                systemName: "square.grid.2x2",
-                action: {
-                    gridMode = .compact
-                }
-            )
+        LiquidGlassContainer(spacing: 16.0) {
+            HStack(spacing: 8) {
+                ToggleButton(
+                    mode: .compact,
+                    currentMode: $gridMode,
+                    systemName: "square.grid.2x2",
+                    action: {
+                        gridMode = .compact
+                    }
+                )
 
-            ToggleButton(
-                mode: .single,
-                currentMode: $gridMode,
-                systemName: "rectangle.fill",
-                action: {
-                    gridMode = .single
-                }
-            )
+                ToggleButton(
+                    mode: .single,
+                    currentMode: $gridMode,
+                    systemName: "rectangle.fill",
+                    action: {
+                        gridMode = .single
+                    }
+                )
+            }
+            .padding(8)
+            .liquidGlass(in: RoundedRectangle(cornerRadius: 14))
+            .padding([.top, .trailing], 8)
         }
-        .padding(8)
-        .glassBackground(RoundedRectangle(cornerRadius: 14), material: .ultraThinMaterial)
-        .padding([.top, .trailing], 8)
     }
 }
 

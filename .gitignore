@@ -137,3 +137,4 @@ vendor/bundle/
 # App Store Connect API Key
 AuthKey_*.p8
 
+buildServer.json

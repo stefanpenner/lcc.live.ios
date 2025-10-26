@@ -1,74 +1,81 @@
 import SwiftUI
 
-struct ModernTabBar: View {
+@available(iOS 26.0, *)
+struct UnifiedBottomBarToolbar: View {
     let tabs: [String]
     @Binding var selectedTab: Int
+    @Binding var gridMode: PhotoTabView.GridMode
     @Binding var showConnectionDetails: Bool
 
     var body: some View {
         HStack(spacing: 12) {
-            // Left: App icon
-            Image(systemName: "mountain.2")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.secondary)
-            
-            // Center: Tab buttons
-            HStack(spacing: 8) {
+            Picker("", selection: $selectedTab) {
                 ForEach(0 ..< tabs.count, id: \.self) { idx in
-                    Button(action: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                            selectedTab = idx
-                            #if os(iOS)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                        }
-                    }) {
-                    HStack(spacing: 6) {
-                        Text(tabs[idx].uppercased())
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(
-                                selectedTab == idx 
-                                    ? AnyShapeStyle(.primary)
-                                    : AnyShapeStyle(.secondary)
-                            )
-                    }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 18)
-                    .glassBackground(
-                        Capsule(),
-                        material: selectedTab == idx ? .thinMaterial : .ultraThinMaterial,
-                        tint: selectedTab == idx ? Color.accentColor : nil,
-                        edgeColor: selectedTab == idx ? Color.accentColor : nil,
-                        strokeOpacity: selectedTab == idx ? 0.45 : 0.20,
-                        shadowOpacity: selectedTab == idx ? 0.16 : 0.10
-                    )
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: selectedTab)
-                    }
-                    .buttonStyle(.plain)
+                    Text(tabs[idx].uppercased()).tag(idx)
                 }
             }
-            
-            // Right: Connection status
+            .pickerStyle(.segmented)
+            .controlSize(.large)
+
+            Divider()
+                .frame(height: 28)
+                .overlay(Color.primary.opacity(0.15))
+
+            Picker("", selection: $gridMode) {
+                Image(systemName: "square.grid.2x2").tag(PhotoTabView.GridMode.compact)
+                Image(systemName: "rectangle.fill").tag(PhotoTabView.GridMode.single)
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.large)
+
             ConnectionStatusView(showDetails: $showConnectionDetails)
-                .scaleEffect(0.85) // Make it slightly smaller to fit
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .glassBackground(Capsule(), material: .ultraThinMaterial)
-        .padding(.bottom, 24)
-        .padding(.horizontal, 32)
-        .frame(maxWidth: 480)
-        .offset(y: 8)
+    }
+}
+
+@available(iOS 26.0, *)
+struct UnifiedBottomBar: View {
+    let tabs: [String]
+    @Binding var selectedTab: Int
+    @Binding var gridMode: PhotoTabView.GridMode
+    @Binding var showConnectionDetails: Bool
+
+    var body: some View {
+        LiquidGlassContainer(spacing: 16.0) {
+            HStack(spacing: 12) {
+                // Left: Segmented tab picker (drag between items)
+                Picker("", selection: $selectedTab) {
+                    ForEach(0 ..< tabs.count, id: \.self) { idx in
+                        Text(tabs[idx].uppercased()).tag(idx)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                // Separator between sections
+                Divider()
+                    .frame(height: 28)
+                    .overlay(Color.primary.opacity(0.15))
+
+                // Right: Segmented grid/list picker + connection status
+                Picker("", selection: $gridMode) {
+                    Image(systemName: "square.grid.2x2").tag(PhotoTabView.GridMode.compact)
+                    Image(systemName: "rectangle.fill").tag(PhotoTabView.GridMode.single)
+                }
+                .pickerStyle(.segmented)
+
+                ConnectionStatusView(showDetails: $showConnectionDetails)
+                    .scaleEffect(0.9)
+            }
+            .liquidGlass(in: Capsule(), isInteractive: false)
+        }
     }
 }
 
 #Preview {
-    ModernTabBar(
-        tabs: [
-            "LCC",
-            "BCC",
-        ],
+    UnifiedBottomBar(
+        tabs: ["LCC", "BCC"],
         selectedTab: .constant(0),
+        gridMode: .constant(.compact),
         showConnectionDetails: .constant(false)
     )
     .environmentObject(NetworkMonitor.shared)

@@ -128,17 +128,20 @@ struct YouTubeThumbnailView: View {
                 placeholderView
             }
             
-            // Play button overlay
-            ZStack {
-                Circle()
-                    .fill(Color.black.opacity(0.7))
-                    .frame(width: 60, height: 60)
-                
+            // Enhanced play button overlay with Liquid Glass
+            Button(action: {}) {
                 Image(systemName: "play.fill")
-                    .font(.system(size: 24))
+                    .font(.system(size: 24, weight: .medium))
                     .foregroundColor(.white)
                     .offset(x: 2) // Slight offset to visually center the play icon
             }
+            .frame(width: 60, height: 60)
+            .liquidGlass(
+                tint: Color.white.opacity(0.15),
+                in: Circle(),
+                isInteractive: true
+            )
+            .disabled(true) // Disabled since this is just a thumbnail
         }
         .frame(width: width, height: height)
         .onAppear {
@@ -157,9 +160,20 @@ struct YouTubeThumbnailView: View {
                     )
                 )
             
-            Image(systemName: "video.fill")
-                .font(.system(size: 40))
-                .foregroundColor(.white.opacity(0.7))
+            VStack(spacing: 8) {
+                Image(systemName: "video.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.white.opacity(0.7))
+                
+                Text("Video")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .liquidGlass(
+                tint: Color.white.opacity(0.1),
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .padding()
         }
         .frame(width: width, height: height)
     }

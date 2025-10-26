@@ -25,8 +25,8 @@
 
 /* Begin PBXFileReference section */
 		E21BA5B12DC2C9F9008638D3 /* lcc.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = lcc.app; sourceTree = BUILT_PRODUCTS_DIR; };
-        E21BA5C12DC2C9F9008638D3 /* lccTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = lccTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-        E21BA5CB2DC2C9F9008638D3 /* lccUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = lccUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E21BA5C12DC2C9F9008638D3 /* lccTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = lccTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E21BA5CB2DC2C9F9008638D3 /* lccUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = lccUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -86,8 +86,8 @@
 			isa = PBXGroup;
 			children = (
 				E21BA5B12DC2C9F9008638D3 /* lcc.app */,
-                E21BA5C12DC2C9F9008638D3 /* lccTests.xctest */,
-                E21BA5CB2DC2C9F9008638D3 /* lccUITests.xctest */,
+				E21BA5C12DC2C9F9008638D3 /* lccTests.xctest */,
+				E21BA5CB2DC2C9F9008638D3 /* lccUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -137,8 +137,8 @@
 			packageProductDependencies = (
 			);
 			productName = lccTests;
-            productReference = E21BA5C12DC2C9F9008638D3 /* lccTests.xctest */;
-            productType = "com.apple.product-type.bundle.unit-test";
+			productReference = E21BA5C12DC2C9F9008638D3 /* lccTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		E21BA5CA2DC2C9F9008638D3 /* lccUITests */ = {
 			isa = PBXNativeTarget;
@@ -160,8 +160,8 @@
 			packageProductDependencies = (
 			);
 			productName = lccUITests;
-            productReference = E21BA5CB2DC2C9F9008638D3 /* lccUITests.xctest */;
-            productType = "com.apple.product-type.bundle.ui-testing";
+			productReference = E21BA5CB2DC2C9F9008638D3 /* lccUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -321,7 +321,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -378,7 +378,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -406,6 +406,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -437,6 +438,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -457,7 +459,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = lcc.live.lccTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -475,7 +477,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = lcc.live.lccTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";

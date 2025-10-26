@@ -26,13 +26,10 @@ struct ConnectionStatusView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .glassBackground(
-            Capsule(),
-            material: .ultraThinMaterial,
+        .liquidGlass(
             tint: statusColor,
-            edgeColor: statusColor,
-            strokeOpacity: 0.30,
-            shadowOpacity: 0.18
+            in: Capsule(),
+            isInteractive: true
         )
         .onTapGesture {
             withAnimation(.spring(response: 0.3)) {

@@ -3,7 +3,7 @@
 > Live camera feeds for Utah's Little & Big Cottonwood Canyons
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![iOS](https://img.shields.io/badge/iOS-18.0+-blue)
+![iOS](https://img.shields.io/badge/iOS-26.0+-blue)
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
 
 ## Features
@@ -127,7 +127,7 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for complete guide.
 
 ## Requirements
 
-- iOS 18.0+
+- iOS 26.0+
 - Xcode 15.2+
 - Ruby 3.2+ (for Fastlane)
 
