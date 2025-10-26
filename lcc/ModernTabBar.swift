@@ -8,25 +8,18 @@ struct UnifiedBottomBarToolbar: View {
     @Binding var showConnectionDetails: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack {
             Picker("", selection: $selectedTab) {
-                ForEach(0 ..< tabs.count, id: \.self) { idx in
-                    Text(tabs[idx].uppercased()).tag(idx)
-                }
+                Text("LCC").tag(0)
+                Text("BCC").tag(1)
             }
             .pickerStyle(.segmented)
-            .controlSize(.large)
-
-            Divider()
-                .frame(height: 28)
-                .overlay(Color.primary.opacity(0.15))
 
             Picker("", selection: $gridMode) {
                 Image(systemName: "square.grid.2x2").tag(PhotoTabView.GridMode.compact)
                 Image(systemName: "rectangle.fill").tag(PhotoTabView.GridMode.single)
             }
             .pickerStyle(.segmented)
-            .controlSize(.large)
 
             ConnectionStatusView(showDetails: $showConnectionDetails)
         }

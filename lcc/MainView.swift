@@ -23,8 +23,7 @@ struct MainView: View {
     
     @State private var fullScreenMedia: PresentedMedia? = nil
     @State private var overlayUUID = UUID()
-    @State private var showUIControls = true
-    @State private var uiControlsTimer: Timer?
+    // Removed manual UI controls hiding/showing; rely on system defaults
     @State private var showConnectionDetails = false
     
     private var currentMediaItems: [MediaItem] {
@@ -39,8 +38,8 @@ struct MainView: View {
                 overlayUUID = UUID()
                 fullScreenMedia = media
             },
-            onScrollActivity: resetUIControlsTimer,
-            onScrollDirectionChanged: handleScrollDirection
+            onScrollActivity: { },
+            onScrollDirectionChanged: { _ in }
         )
         .tag(0)
     }
@@ -53,69 +52,17 @@ struct MainView: View {
                 overlayUUID = UUID()
                 fullScreenMedia = media
             },
-            onScrollActivity: resetUIControlsTimer,
-            onScrollDirectionChanged: handleScrollDirection
+            onScrollActivity: { },
+            onScrollDirectionChanged: { _ in }
         )
         .tag(1)
     }
     
-    private func resetUIControlsTimer() {
-        // Cancel any existing timer
-        uiControlsTimer?.invalidate()
-        
-        // Show controls
-        withAnimation(.easeOut(duration: 0.3)) {
-            showUIControls = true
-        }
-        
-        // Auto-hide after 3 seconds of no activity (unless connection dialog is open)
-        uiControlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
-            // Don't hide if connection details dialog is open
-            if !showConnectionDetails {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    showUIControls = false
-                }
-            }
-        }
-    }
+    // Removed resetUIControlsTimer
     
-    private func handleScrollDirection(_ direction: PhotoTabView.ScrollDirection) {
-        #if DEBUG
-        print("📱 MainView: handleScrollDirection called with: \(direction)")
-        #endif
-        
-        switch direction {
-        case .down:
-            // Scrolling down - hide controls immediately
-            #if DEBUG
-            print("📱 MainView: Hiding controls")
-            #endif
-            uiControlsTimer?.invalidate()
-            withAnimation(.easeOut(duration: 0.3)) {
-                showUIControls = false
-            }
-        case .up:
-            // Scrolling up - show controls and start auto-hide timer
-            #if DEBUG
-            print("📱 MainView: Showing controls")
-            #endif
-            resetUIControlsTimer()
-        case .idle:
-            break
-        }
-    }
+    // Removed handleScrollDirection
     
-    private func toggleUIControls() {
-        uiControlsTimer?.invalidate()
-        
-        withAnimation(.easeOut(duration: 0.3)) {
-            showUIControls.toggle()
-        }
-        
-        if showUIControls {
-            resetUIControlsTimer()
-        }
-    }
+    // Removed toggleUIControls
     
     var body: some View {
         GeometryReader { geometry in
@@ -207,10 +154,6 @@ struct MainView: View {
                             }
                         }
                 )
-                .onChange(of: selectedTab) {
-                    // Show controls when switching tabs
-                    resetUIControlsTimer()
-                }
             
             // fades moved to overlay modifiers pinned to device edges
             
@@ -233,17 +176,7 @@ struct MainView: View {
 
                 // Removed tap shield to allow lists/grids to scroll normally
                 
-                // Invisible tap area at top to show controls when hidden
-                if !showUIControls {
-                    Color.clear
-                        .frame(width: geometry.size.width, height: 100)
-                        .contentShape(Rectangle())
-                        .position(x: geometry.size.width / 2, y: 50)
-                        .onTapGesture {
-                            resetUIControlsTimer()
-                        }
-                        .zIndex(2.5)
-                }
+                // Removed tap area for manual show controls
             }
             }
             .background(Color.black)
@@ -269,47 +202,31 @@ struct MainView: View {
         .toolbar {
             if fullScreenMedia == nil {
                 ToolbarItem(placement: .bottomBar) {
-                    UnifiedBottomBarToolbar(
-                        tabs: ["LCC", "BCC"],
-                        selectedTab: $selectedTab,
-                        gridMode: $gridMode,
-                        showConnectionDetails: $showConnectionDetails
-                    )
-                    .opacity(showUIControls ? 1 : 0)
-                    .animation(.easeOut(duration: 0.3), value: showUIControls)
+                    Picker("", selection: $selectedTab) {
+                        Text("LCC").tag(0)
+                        Text("BCC").tag(1)
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                ToolbarItem(placement: .bottomBar) {
+                    HStack {
+                        Picker("", selection: $gridMode) {
+                            Image(systemName: "square.grid.2x2").tag(PhotoTabView.GridMode.compact)
+                            Image(systemName: "rectangle.fill").tag(PhotoTabView.GridMode.single)
+                        }
+                        .pickerStyle(.segmented)
+
+                        ConnectionStatusView(showDetails: $showConnectionDetails)
+                    }
                 }
             }
         }
         .toolbarBackground(.visible, for: .bottomBar)
         .ignoresSafeArea(.keyboard, edges: .bottom)
-        .onChange(of: selectedTab) {
-            refreshImagesTrigger += 1
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
-                refreshImagesTrigger += 1
-            }
-        }
-        .onChange(of: fullScreenMedia) { _, newValue in
-            isAnyFullScreen = newValue != nil
-        }
-        .onChange(of: showConnectionDetails) { _, isOpen in
-            // When dialog closes, restart auto-hide timer
-            if !isOpen {
-                resetUIControlsTimer()
-            } else {
-                // When dialog opens, cancel auto-hide timer
-                uiControlsTimer?.invalidate()
-            }
-        }
-        .onAppear {
-            // Show controls on initial load with auto-hide
-            resetUIControlsTimer()
-        }
-        .onDisappear {
-            // Clean up timer
-            uiControlsTimer?.invalidate()
-        }
+        .onChange(of: selectedTab) { refreshImagesTrigger += 1 }
+        .onChange(of: scenePhase) { _, newPhase in if newPhase == .active { refreshImagesTrigger += 1 } }
+        .onChange(of: fullScreenMedia) { _, newValue in isAnyFullScreen = newValue != nil }
     }
 }
 
