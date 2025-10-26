@@ -157,27 +157,7 @@ struct MainView: View {
             
             // fades moved to overlay modifiers pinned to device edges
             
-            // Overlay the fullscreen media if needed
-            if let presented = fullScreenMedia {
-                FullScreenImageGalleryView(
-                    mediaItems: currentMediaItems,
-                    initialMediaItem: presented.mediaItem,
-                    onDismiss: {
-                        withAnimation { fullScreenMedia = nil }
-                    },
-                    onTabChange: nil // Do not allow tab switching from fullscreen
-                )
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-                .id(overlayUUID)
-                .transition(.opacity)
-                .zIndex(3)
-            } else {
-
-                // Removed tap shield to allow lists/grids to scroll normally
-                
-                // Removed tap area for manual show controls
-            }
+            // Fullscreen overlay moved to .fullScreenCover
             }
             .background(Color.black)
             .ignoresSafeArea(edges: .all)
@@ -223,6 +203,13 @@ struct MainView: View {
             }
         }
         .toolbarBackground(.visible, for: .bottomBar)
+        .fullScreenCover(item: $fullScreenMedia) { presented in
+            GalleryFullScreenView(
+                items: currentMediaItems,
+                initialIndex: currentMediaItems.firstIndex(where: { $0.url == presented.mediaItem.url }) ?? 0,
+                onClose: { fullScreenMedia = nil }
+            )
+        }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .onChange(of: selectedTab) { refreshImagesTrigger += 1 }
         .onChange(of: scenePhase) { _, newPhase in if newPhase == .active { refreshImagesTrigger += 1 } }
