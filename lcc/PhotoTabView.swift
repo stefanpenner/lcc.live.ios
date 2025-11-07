@@ -37,6 +37,8 @@ struct PhotoTabView: View {
             let gridItems = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: columns)
             
             ZStack {
+                Color.black.ignoresSafeArea(.all)
+                
                 // Main content
                 ScrollViewReader { proxy in
                     ScrollView {

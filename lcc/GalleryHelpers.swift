@@ -11,6 +11,12 @@ func clampIndex(_ index: Int, count: Int) -> Int {
 /// Returns nil if the item's URL string is invalid.
 func galleryShareURL(for media: MediaItem?) -> URL? {
     guard let media = media else { return nil }
+    
+    // If identifier is available, use camera URL format
+    if let identifier = media.identifier {
+        return URL(string: "https://lcc.live/camera/\(identifier)")
+    }
+    
     switch media.type {
     case .image:
         // Pass through if already proxied via lcc.live

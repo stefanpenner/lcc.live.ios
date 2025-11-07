@@ -148,6 +148,25 @@ struct GalleryHelperTests {
             Issue.record("Expected lcc.live proxy URL")
         }
     }
+    
+    @Test("galleryShareURL uses camera URL format when identifier is present")
+    func testShareURLCameraFormat() {
+        let imageURL = "https://example.com/image.jpg"
+        let identifier = "test-camera-id-123"
+        let mediaItem = MediaItem.from(urlString: imageURL, identifier: identifier)
+        
+        let shareURL = galleryShareURL(for: mediaItem)
+        #expect(shareURL?.absoluteString == "https://lcc.live/camera/\(identifier)")
+    }
+    
+    @Test("galleryShareURL falls back to image format when identifier is nil")
+    func testShareURLFallbackWithoutIdentifier() {
+        let imageURL = "https://example.com/image.jpg"
+        let mediaItem = MediaItem.from(urlString: imageURL, identifier: nil)
+        
+        let shareURL = galleryShareURL(for: mediaItem)
+        #expect(shareURL?.absoluteString.hasPrefix("https://lcc.live/image/") == true)
+    }
 }
 
 // MARK: - Invalid Input Tests (Edge cases)

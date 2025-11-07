@@ -26,17 +26,22 @@ struct GalleryFullScreenView: View {
 
     var body: some View {
         NavigationStack {
-            TabView(selection: $index) {
-                ForEach(items.indices, id: \.self) { i in
-                    page(for: items[i])
-                        .tag(i)
-                        .background(Color.black)
-                        .ignoresSafeArea(edges: .all)
+            ZStack {
+                Color.black.ignoresSafeArea(.all)
+                
+                TabView(selection: $index) {
+                    ForEach(items.indices, id: \.self) { i in
+                        page(for: items[i])
+                            .tag(i)
+                            .background(Color.black)
+                            .ignoresSafeArea(edges: .all)
+                    }
                 }
+                .tabViewStyle(.page)
+                .background(Color.black)
+                .ignoresSafeArea(edges: .all)
             }
-            .tabViewStyle(.page)
-            .background(Color.black)
-            .ignoresSafeArea(edges: .all)
+            .background(Color.black.ignoresSafeArea(.all))
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close", action: onClose)
@@ -84,6 +89,7 @@ struct GalleryFullScreenView: View {
                     }
             )
         }
+        .background(Color.black.ignoresSafeArea(.all))
         .ignoresSafeArea(edges: .all)
     }
 
@@ -97,7 +103,12 @@ struct GalleryFullScreenView: View {
                     case .success(let image): 
                         ZoomableImageView(image: image)
                     case .failure: Color.black
-                    case .empty: ProgressView()
+                    case .empty: 
+                        ZStack {
+                            Color.black
+                            ProgressView()
+                                .tint(.white)
+                        }
                     @unknown default: Color.black
                     }
                 }
@@ -127,12 +138,14 @@ struct ZoomableImageView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            image
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .scaleEffect(scale)
-                .offset(offset)
+            ZStack {
+                Color.black
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .scaleEffect(scale)
+                    .offset(offset)
                 .gesture(
                     MagnificationGesture()
                         .onChanged { value in
@@ -175,6 +188,7 @@ struct ZoomableImageView: View {
                             lastOffset = offset
                         }
                 )
+            }
         }
     }
     

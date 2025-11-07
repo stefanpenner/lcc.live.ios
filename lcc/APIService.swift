@@ -214,7 +214,13 @@ class APIService: ObservableObject {
     private func parseMediaItems(from data: Data) throws -> [MediaItem] {
         let json = try JSONSerialization.jsonObject(with: data)
         
-        // Try each format in order
+        // Try parsing as objects with identifiers first
+        if let mediaItems = extractMediaItemsWithIdentifiers(from: json), !mediaItems.isEmpty {
+            logger.debug("📊 Parsed \(mediaItems.count) media items with identifiers from API")
+            return mediaItems
+        }
+        
+        // Fallback to URL strings format
         if let urlStrings = extractURLStrings(from: json), !urlStrings.isEmpty {
             logger.debug("📊 Parsed \(urlStrings.count) URL strings from API")
             return urlStrings.compactMap { MediaItem.from(urlString: $0) }
@@ -241,6 +247,47 @@ class APIService: ObservableObject {
         }
         
         return nil
+    }
+    
+    /// Extract media items with identifiers from JSON
+    private func extractMediaItemsWithIdentifiers(from json: Any) -> [MediaItem]? {
+        // Format 1: Array of objects with identifiers
+        if let objectArray = json as? [[String: Any]] {
+            return objectArray.compactMap { extractMediaItem(from: $0) }
+        }
+        
+        // Format 2: Object with cameras array
+        if let object = json as? [String: Any],
+           let cameras = object["cameras"] as? [[String: Any]] {
+            return cameras.compactMap { extractMediaItem(from: $0) }
+        }
+        
+        // Format 3: Object with images array of objects
+        if let object = json as? [String: Any],
+           let images = object["images"] as? [[String: Any]] {
+            return images.compactMap { extractMediaItem(from: $0) }
+        }
+        
+        return nil
+    }
+    
+    /// Extract a MediaItem from a single object, including identifier if available
+    private func extractMediaItem(from object: [String: Any]) -> MediaItem? {
+        // Extract URL
+        guard let urlString = extractURL(from: object) else { return nil }
+        
+        // Extract identifier (check common field names)
+        let identifier: String? = {
+            if let id = object["id"] as? String { return id }
+            if let id = object["identifier"] as? String { return id }
+            if let id = object["idf"] as? String { return id }
+            if let id = object["id"] as? Int { return String(id) }
+            if let id = object["identifier"] as? Int { return String(id) }
+            if let id = object["idf"] as? Int { return String(id) }
+            return nil
+        }()
+        
+        return MediaItem.from(urlString: urlString, identifier: identifier)
     }
     
     /// Extract URLs from an array of objects

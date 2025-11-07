@@ -1,0 +1,10 @@
+# Cursor Rules for LCC iOS App
+
+## Build Verification
+After every major change, ensure the app still runs/builds/tests successfully. Always verify compilation before considering a task complete.
+
+## Project Context
+- iOS app built with SwiftUI
+- Uses Xcode project structure
+- Build command: `fastlane build`
+- Test command: `fastlane test`

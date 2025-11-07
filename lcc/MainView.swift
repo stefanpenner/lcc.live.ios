@@ -42,28 +42,92 @@ struct MainView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // LCC Tab
-            PhotoTabView(
-                mediaItems: mediaItems.lcc,
-                gridMode: $gridMode,
-                onRequestFullScreen: { media in
-                    fullScreenMedia = media
+            NavigationStack {
+                PhotoTabView(
+                    mediaItems: mediaItems.lcc,
+                    gridMode: $gridMode,
+                    onRequestFullScreen: { media in
+                        fullScreenMedia = media
+                    }
+                )
+                .toolbar {
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        // Status button
+                        Button {
+                            showConnectionDetails.toggle()
+                        } label: {
+                            Circle()
+                                .fill(statusColor)
+                                .frame(width: 8, height: 8)
+                                .shadow(color: statusColor.opacity(0.6), radius: 4)
+                        }
+                        .popover(isPresented: $showConnectionDetails) {
+                            ConnectionDetailsView()
+                                .presentationCompactAdaptation(.popover)
+                        }
+                        
+                        Spacer()
+                        
+                        // Grid mode toggle
+                        Button {
+                            withAnimation {
+                                gridMode = gridMode == .single ? .compact : .single
+                            }
+                        } label: {
+                            Image(systemName: gridMode == .single ? "square.grid.2x2" : "rectangle.fill")
+                        }
+                    }
                 }
-            )
-            .tabItem { Tab.lcc.label }
+            }
             .tag(Tab.lcc)
+            .tabItem {
+                Label("LCC", systemImage: "mountain.2")
+            }
             
             // BCC Tab
-            PhotoTabView(
-                mediaItems: mediaItems.bcc,
-                gridMode: $gridMode,
-                onRequestFullScreen: { media in
-                    fullScreenMedia = media
+            NavigationStack {
+                PhotoTabView(
+                    mediaItems: mediaItems.bcc,
+                    gridMode: $gridMode,
+                    onRequestFullScreen: { media in
+                        fullScreenMedia = media
+                    }
+                )
+                .toolbar {
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        // Status button
+                        Button {
+                            showConnectionDetails.toggle()
+                        } label: {
+                            Circle()
+                                .fill(statusColor)
+                                .frame(width: 8, height: 8)
+                                .shadow(color: statusColor.opacity(0.6), radius: 4)
+                        }
+                        .popover(isPresented: $showConnectionDetails) {
+                            ConnectionDetailsView()
+                                .presentationCompactAdaptation(.popover)
+                        }
+                        
+                        Spacer()
+                        
+                        // Grid mode toggle
+                        Button {
+                            withAnimation {
+                                gridMode = gridMode == .single ? .compact : .single
+                            }
+                        } label: {
+                            Image(systemName: gridMode == .single ? "square.grid.2x2" : "rectangle.fill")
+                        }
+                    }
                 }
-            )
-            .tabItem { Tab.bcc.label }
+            }
             .tag(Tab.bcc)
+            .tabItem {
+                Label("BCC", systemImage: "mountain.2")
+            }
         }
-        .background(Color.black)
+        .background(Color.black.ignoresSafeArea(.all))
         .overlay(alignment: .top) {
             LinearGradient(
                 gradient: Gradient(stops: [
@@ -77,49 +141,6 @@ struct MainView: View {
             .frame(maxWidth: .infinity, maxHeight: 140)
             .ignoresSafeArea(edges: [.top, .leading, .trailing])
             .allowsHitTesting(false)
-        }
-        .overlay(alignment: .topLeading) {
-            if fullScreenMedia == nil {
-                Button {
-                    showConnectionDetails.toggle()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "mountain.2.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                        Circle()
-                            .fill(statusColor)
-                            .frame(width: 10, height: 10)
-                            .shadow(color: statusColor.opacity(0.6), radius: 4)
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: Capsule())
-                }
-                .popover(isPresented: $showConnectionDetails) {
-                    ConnectionDetailsView()
-                        .presentationCompactAdaptation(.popover)
-                }
-                .padding(.top, 60)
-                .padding(.leading, 16)
-            }
-        }
-        .overlay(alignment: .topTrailing) {
-            if fullScreenMedia == nil {
-                Button {
-                    withAnimation {
-                        gridMode = gridMode == .single ? .compact : .single
-                    }
-                } label: {
-                    Image(systemName: gridMode == .single ? "square.grid.2x2" : "rectangle.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
-                .padding(.top, 60)
-                .padding(.trailing, 16)
-            }
         }
         .fullScreenCover(item: $fullScreenMedia) { presented in
             GalleryFullScreenView(

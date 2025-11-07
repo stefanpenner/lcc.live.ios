@@ -54,6 +54,7 @@ struct ContentView: View {
                 bcc: apiService.bccMedia
             )
         )
+        .background(Color.black.ignoresSafeArea(.all))
         .onChange(of: apiService.lccMedia) { oldValue, newValue in
             if !newValue.isEmpty {
                 preloader.preloadMedia(from: newValue)
