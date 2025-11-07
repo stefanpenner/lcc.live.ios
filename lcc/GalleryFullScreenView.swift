@@ -8,40 +8,41 @@ struct GalleryFullScreenView: View {
     @State private var index: Int
     @State private var dragOffset: CGFloat = 0
     @State private var isDragging: Bool = false
-
+    @State private var dismissOpacity: Double = 1.0
+    
     init(items: [MediaItem], initialIndex: Int, onClose: @escaping () -> Void) {
         self.items = items
         self.initialIndex = clampIndex(initialIndex, count: items.count)
         self.onClose = onClose
         _index = State(initialValue: self.initialIndex)
     }
-    
-    private var dismissOpacity: Double {
-        if isDragging {
-            let progress = Double(abs(dragOffset)) / 300.0
-            return max(0, 1.0 - progress)
-        }
-        return 1.0
-    }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea(.all)
+                // Black background that stays visible even when dragging
+                Color.black
+                    .ignoresSafeArea(.all)
+                    .zIndex(0)
                 
                 TabView(selection: $index) {
                     ForEach(items.indices, id: \.self) { i in
                         page(for: items[i])
                             .tag(i)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(Color.black)
                             .ignoresSafeArea(edges: .all)
                     }
                 }
-                .tabViewStyle(.page)
+                .tabViewStyle(.page(indexDisplayMode: .never))
                 .background(Color.black)
                 .ignoresSafeArea(edges: .all)
+                .zIndex(1)
+                .disabled(isDragging) // Disable TabView swipe during drag to prevent conflicts
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.black.ignoresSafeArea(.all))
+            .ignoresSafeArea(edges: .all)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close", action: onClose)
@@ -69,8 +70,18 @@ struct GalleryFullScreenView: View {
                         
                         // Only allow downward drags that are more vertical than horizontal
                         if translation > 0 && vertical > horizontal {
-                            isDragging = true
-                            dragOffset = translation
+                            if !isDragging {
+                                isDragging = true
+                            }
+                            // Update drag offset and opacity without animation for smooth dragging
+                            // Use transaction to disable animations during drag
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) {
+                                dragOffset = translation
+                                let progress = Double(abs(translation)) / 300.0
+                                dismissOpacity = max(0, 1.0 - progress)
+                            }
                         }
                     }
                     .onEnded { value in
@@ -79,10 +90,22 @@ struct GalleryFullScreenView: View {
                         
                         // Close if dragged down enough or fast velocity
                         if translation > 150 || velocity > 500 {
-                            onClose()
+                            // Animate out before closing
+                            // Use a large value instead of UIScreen.main.bounds.height for better compatibility
+                            let screenHeight: CGFloat = 1000 // Large enough value to animate off screen
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                dragOffset = screenHeight
+                                dismissOpacity = 0
+                            }
+                            // Close after animation completes
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                onClose()
+                            }
                         } else {
+                            // Animate back smoothly - reset all state together in a single animation
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 dragOffset = 0
+                                dismissOpacity = 1.0
                                 isDragging = false
                             }
                         }
@@ -91,6 +114,7 @@ struct GalleryFullScreenView: View {
         }
         .background(Color.black.ignoresSafeArea(.all))
         .ignoresSafeArea(edges: .all)
+        .preferredColorScheme(.dark) // Ensure dark mode for consistent black background
     }
 
     @ViewBuilder
@@ -102,21 +126,29 @@ struct GalleryFullScreenView: View {
                     switch phase {
                     case .success(let image): 
                         ZoomableImageView(image: image)
-                    case .failure: Color.black
+                            .ignoresSafeArea(.all)
+                    case .failure: 
+                        Color.black
+                            .ignoresSafeArea(.all)
                     case .empty: 
                         ZStack {
                             Color.black
                             ProgressView()
                                 .tint(.white)
                         }
-                    @unknown default: Color.black
+                        .ignoresSafeArea(.all)
+                    @unknown default: 
+                        Color.black
+                            .ignoresSafeArea(.all)
                     }
                 }
             } else {
                 Color.black
+                    .ignoresSafeArea(.all)
             }
         case .youtubeVideo(let embedURL):
             YouTubePlayerView(embedURL: embedURL, autoplay: true)
+                .ignoresSafeArea(.all)
         }
     }
 
@@ -140,56 +172,62 @@ struct ZoomableImageView: View {
         GeometryReader { geometry in
             ZStack {
                 Color.black
+                    .ignoresSafeArea(.all)
+                
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .scaleEffect(scale)
                     .offset(offset)
-                .gesture(
-                    MagnificationGesture()
-                        .onChanged { value in
-                            let delta = value / lastScale
-                            lastScale = value
-                            let newScale = scale * delta
-                            scale = min(max(newScale, 1.0), 4.0)
-                        }
-                        .onEnded { _ in
-                            lastScale = 1.0
-                            if scale < 1.0 {
-                                withAnimation(.spring(response: 0.3)) {
-                                    scale = 1.0
-                                    offset = .zero
-                                    lastOffset = .zero
+                    .clipped()
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { value in
+                                let delta = value / lastScale
+                                lastScale = value
+                                let newScale = scale * delta
+                                scale = min(max(newScale, 1.0), 4.0)
+                            }
+                            .onEnded { _ in
+                                lastScale = 1.0
+                                if scale < 1.0 {
+                                    withAnimation(.spring(response: 0.3)) {
+                                        scale = 1.0
+                                        offset = .zero
+                                        lastOffset = .zero
+                                    }
                                 }
                             }
+                    )
+                    .onTapGesture(count: 2) {
+                        // Double-tap always resets zoom to normal
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            scale = 1.0
+                            offset = .zero
+                            lastOffset = .zero
                         }
-                )
-                .onTapGesture(count: 2) {
-                    // Double-tap always resets zoom to normal
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        scale = 1.0
-                        offset = .zero
-                        lastOffset = .zero
                     }
-                }
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: scale > 1.0 ? 0 : 30)
-                        .onChanged { value in
-                            guard scale > 1.0 else { return }
-                            let newOffset = CGSize(
-                                width: lastOffset.width + value.translation.width,
-                                height: lastOffset.height + value.translation.height
-                            )
-                            offset = limitOffset(newOffset, geometry: geometry)
-                        }
-                        .onEnded { _ in
-                            guard scale > 1.0 else { return }
-                            lastOffset = offset
-                        }
-                )
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: scale > 1.0 ? 0 : 30)
+                            .onChanged { value in
+                                guard scale > 1.0 else { return }
+                                let newOffset = CGSize(
+                                    width: lastOffset.width + value.translation.width,
+                                    height: lastOffset.height + value.translation.height
+                                )
+                                offset = limitOffset(newOffset, geometry: geometry)
+                            }
+                            .onEnded { _ in
+                                guard scale > 1.0 else { return }
+                                lastOffset = offset
+                            }
+                    )
             }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .ignoresSafeArea(.all)
         }
+        .ignoresSafeArea(.all)
     }
     
     private func limitOffset(_ offset: CGSize, geometry: GeometryProxy) -> CGSize {
