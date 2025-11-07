@@ -213,73 +213,67 @@ class APIService: ObservableObject {
     /// - Object with cameras array: {"cameras": [{"kind": "img", "src": "url"}, {"kind": "iframe", "src": "..."}]}
     private func parseMediaItems(from data: Data) throws -> [MediaItem] {
         let json = try JSONSerialization.jsonObject(with: data)
-        var urlStrings: [String] = []
         
-        // Try array of strings
+        // Try each format in order
+        if let urlStrings = extractURLStrings(from: json), !urlStrings.isEmpty {
+            logger.debug("📊 Parsed \(urlStrings.count) URL strings from API")
+            return urlStrings.compactMap { MediaItem.from(urlString: $0) }
+        }
+        
+        throw APIError.invalidJSONFormat
+    }
+    
+    /// Extract URL strings from various JSON formats
+    private func extractURLStrings(from json: Any) -> [String]? {
+        // Format 1: Array of strings
         if let stringArray = json as? [String] {
-            urlStrings = stringArray
-        }
-        // Try array of objects with "url" or "iframe" field
-        else if let objectArray = json as? [[String: Any]] {
-            urlStrings = objectArray.compactMap { object in
-                // Check for iframe field (YouTube embed)
-                if let iframe = object["iframe"] as? String {
-                    return iframe
-                }
-                // Check for url field
-                if let url = object["url"] as? String {
-                    return url
-                }
-                // Check for src field (cameras array format)
-                if let src = object["src"] as? String {
-                    return src
-                }
-                return nil
-            }
-        }
-        // Try object with "cameras" or "images" array
-        else if let object = json as? [String: Any] {
-            // Check for cameras array (new API format)
-            if let cameras = object["cameras"] as? [[String: Any]] {
-                urlStrings = cameras.compactMap { camera in
-                    // Get the src field which contains the URL or iframe
-                    if let src = camera["src"] as? String {
-                        return src
-                    }
-                    // Also check iframe field as fallback
-                    if let iframe = camera["iframe"] as? String {
-                        return iframe
-                    }
-                    return nil
-                }
-            }
-            // Check for images array (legacy format)
-            else if let images = object["images"] as? [String] {
-                urlStrings = images
-            } else if let images = object["images"] as? [[String: Any]] {
-                urlStrings = images.compactMap { obj in
-                    if let iframe = obj["iframe"] as? String {
-                        return iframe
-                    }
-                    if let url = obj["url"] as? String {
-                        return url
-                    }
-                    if let src = obj["src"] as? String {
-                        return src
-                    }
-                    return nil
-                }
-            }
+            return stringArray
         }
         
-        if urlStrings.isEmpty {
-            throw APIError.invalidJSONFormat
+        // Format 2: Array of objects
+        if let objectArray = json as? [[String: Any]] {
+            return extractURLs(fromObjectArray: objectArray)
         }
         
-        logger.debug("📊 Parsed \(urlStrings.count) URL strings from API")
+        // Format 3: Object with cameras or images array
+        if let object = json as? [String: Any] {
+            return extractURLs(fromObject: object)
+        }
         
-        // Convert URL strings to MediaItems
-        return urlStrings.compactMap { MediaItem.from(urlString: $0) }
+        return nil
+    }
+    
+    /// Extract URLs from an array of objects
+    private func extractURLs(fromObjectArray objects: [[String: Any]]) -> [String] {
+        return objects.compactMap { extractURL(from: $0) }
+    }
+    
+    /// Extract URLs from an object with cameras or images array
+    private func extractURLs(fromObject object: [String: Any]) -> [String]? {
+        // Check for cameras array (new API format)
+        if let cameras = object["cameras"] as? [[String: Any]] {
+            return cameras.compactMap { extractURL(from: $0) }
+        }
+        
+        // Check for images array (legacy format)
+        if let images = object["images"] as? [String] {
+            return images
+        }
+        
+        if let images = object["images"] as? [[String: Any]] {
+            return images.compactMap { extractURL(from: $0) }
+        }
+        
+        return nil
+    }
+    
+    /// Extract URL string from a single object
+    private func extractURL(from object: [String: Any]) -> String? {
+        // Check common URL field names in order of preference
+        if let iframe = object["iframe"] as? String { return iframe }
+        if let url = object["url"] as? String { return url }
+        if let src = object["src"] as? String { return src }
+        return nil
     }
     
     /// Manually trigger a refresh

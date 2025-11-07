@@ -32,50 +32,34 @@ struct MainView: View {
     }
     
     private var statusColor: Color {
-        if !networkMonitor.isConnected {
-            return .red
-        } else if apiService.error != nil {
-            return .orange
-        } else if apiService.isLoading {
-            return .yellow
-        } else {
-            return .green
-        }
+        ConnectionStatusHelper.statusColor(
+            isConnected: networkMonitor.isConnected,
+            hasError: apiService.error != nil,
+            isLoading: apiService.isLoading
+        )
     }
     
     var body: some View {
         TabView(selection: $selectedTab) {
             // LCC Tab
-            ZStack {
-                Color.black.ignoresSafeArea()
-                PhotoTabView(
-                    mediaItems: mediaItems.lcc,
-                    gridMode: $gridMode,
-                    onRequestFullScreen: { media in
-                        fullScreenMedia = media
-                    },
-                    onScrollActivity: { },
-                    onScrollDirectionChanged: { _ in }
-                )
-            }
-            .ignoresSafeArea(edges: [.top, .bottom])
+            PhotoTabView(
+                mediaItems: mediaItems.lcc,
+                gridMode: $gridMode,
+                onRequestFullScreen: { media in
+                    fullScreenMedia = media
+                }
+            )
             .tabItem { Tab.lcc.label }
             .tag(Tab.lcc)
             
             // BCC Tab
-            ZStack {
-                Color.black.ignoresSafeArea()
-                PhotoTabView(
-                    mediaItems: mediaItems.bcc,
-                    gridMode: $gridMode,
-                    onRequestFullScreen: { media in
-                        fullScreenMedia = media
-                    },
-                    onScrollActivity: { },
-                    onScrollDirectionChanged: { _ in }
-                )
-            }
-            .ignoresSafeArea(edges: [.top, .bottom])
+            PhotoTabView(
+                mediaItems: mediaItems.bcc,
+                gridMode: $gridMode,
+                onRequestFullScreen: { media in
+                    fullScreenMedia = media
+                }
+            )
             .tabItem { Tab.bcc.label }
             .tag(Tab.bcc)
         }

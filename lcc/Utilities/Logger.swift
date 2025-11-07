@@ -3,25 +3,21 @@ import OSLog
 
 /// 📝 Structured Logging
 ///
-/// **Use instead of print() or NSLog():**
+/// **Usage:**
 /// ```swift
-/// let logger = Logger(category: .networking)
-/// logger.info("API call succeeded")
-/// logger.error("API call failed", error: error)
-/// ```
-///
-/// **Built-in loggers:**
-/// ```swift
+/// // Static loggers (recommended)
 /// Logger.app.info("App launched")
 /// Logger.networking.error("Network failed")
-/// Logger.ui.debug("Button tapped")
+///
+/// // Or create instances
+/// let logger = Logger(category: .networking)
+/// logger.info("API call succeeded")
 /// ```
 ///
 /// **Benefits:**
 /// - Viewable in Console.app (filter by subsystem)
 /// - Debug logs auto-disabled in production
 /// - Proper log levels (debug, info, warning, error, fault)
-/// - Includes file, function, line automatically
 struct Logger {
     
     /// Log categories for different subsystems
@@ -34,20 +30,9 @@ struct Logger {
         case metrics = "metrics"
     }
     
-    /// Log levels
-    enum Level {
-        case debug
-        case info
-        case warning
-        case error
-        case fault
-    }
-    
     private let logger: os.Logger
-    private let category: Category
     
     init(category: Category) {
-        self.category = category
         self.logger = os.Logger(subsystem: AppEnvironment.bundleIdentifier, category: category.rawValue)
     }
     
@@ -55,39 +40,32 @@ struct Logger {
     
     func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         guard AppEnvironment.debugLoggingEnabled else { return }
-        let context = formatContext(file: file, function: function, line: line)
-        logger.debug("[\(context)] \(message)")
+        let filename = URL(fileURLWithPath: file).lastPathComponent
+        logger.debug("[\(filename):\(line)] \(message)")
     }
     
     func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        let context = formatContext(file: file, function: function, line: line)
-        logger.info("[\(context)] \(message)")
+        let filename = URL(fileURLWithPath: file).lastPathComponent
+        logger.info("[\(filename):\(line)] \(message)")
     }
     
     func warning(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        let context = formatContext(file: file, function: function, line: line)
-        logger.warning("[\(context)] ⚠️ \(message)")
+        let filename = URL(fileURLWithPath: file).lastPathComponent
+        logger.warning("[\(filename):\(line)] ⚠️ \(message)")
     }
     
     func error(_ message: String, error: Error? = nil, file: String = #file, function: String = #function, line: Int = #line) {
-        let context = formatContext(file: file, function: function, line: line)
+        let filename = URL(fileURLWithPath: file).lastPathComponent
         if let error = error {
-            logger.error("[\(context)] ❌ \(message) - Error: \(error.localizedDescription)")
+            logger.error("[\(filename):\(line)] ❌ \(message) - Error: \(error.localizedDescription)")
         } else {
-            logger.error("[\(context)] ❌ \(message)")
+            logger.error("[\(filename):\(line)] ❌ \(message)")
         }
     }
     
     func fault(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        let context = formatContext(file: file, function: function, line: line)
-        logger.fault("[\(context)] 🔥 \(message)")
-    }
-    
-    // MARK: - Helpers
-    
-    private func formatContext(file: String, function: String, line: Int) -> String {
-        let filename = (file as NSString).lastPathComponent
-        return "\(filename):\(line)"
+        let filename = URL(fileURLWithPath: file).lastPathComponent
+        logger.fault("[\(filename):\(line)] 🔥 \(message)")
     }
     
     // MARK: - Static Convenience Loggers
@@ -99,23 +77,3 @@ struct Logger {
     static let imageLoading = Logger(category: .imageLoading)
     static let metrics = Logger(category: .metrics)
 }
-
-// MARK: - Legacy Compatibility
-
-/// Bridge for migrating from NSLog/print to structured logging
-func log(_ message: String, category: Logger.Category = .app, level: Logger.Level = .info) {
-    let logger = Logger(category: category)
-    switch level {
-    case .debug:
-        logger.debug(message)
-    case .info:
-        logger.info(message)
-    case .warning:
-        logger.warning(message)
-    case .error:
-        logger.error(message)
-    case .fault:
-        logger.fault(message)
-    }
-}
-

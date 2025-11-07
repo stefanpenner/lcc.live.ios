@@ -1,6 +1,5 @@
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct GalleryFullScreenView: View {
     let items: [MediaItem]
     let initialIndex: Int
@@ -118,7 +117,6 @@ struct GalleryFullScreenView: View {
     // share URL moved to helper
 }
 
-@available(iOS 26.0, *)
 struct ZoomableImageView: View {
     let image: Image
     

@@ -2,11 +2,17 @@
 #
 # Available commands:
 #   fastlane test           - Run all tests
-#   fastlane build          - Build .ipa file
+#   fastlane build          - Build .ipa file (uses automatic signing for local builds)
+#   fastlane build skip_export:true - Build archive only (skip IPA export)
 #   fastlane beta           - Upload to TestFlight
 #   fastlane screenshots    - Generate App Store screenshots
 #   fastlane release        - Submit to App Store
 #   fastlane bump_version   - Increment version (major/minor/patch)
+#
+# Build behavior:
+#   - If MATCH_GIT_URL is set: Uses match for App Store provisioning
+#   - Otherwise: Uses automatic code signing (development build)
+#   - Use skip_export:true to build archive without exporting IPA
 #
 # First time setup:
 #   gem install fastlane
@@ -29,17 +35,18 @@ platform :ios do
   
   desc "Run all tests"
   lane :test do
+    # Use destination specifier that matches available simulators
     run_tests(
       scheme: "lcc",
       project: "lcc.xcodeproj",
-      devices: ["iPhone 15 Pro"],
+      destination: "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0.1",
       clean: true,
       code_coverage: true
     )
   end
   
   desc "Build the app"
-  lane :build do
+  lane :build do |options|
     # Increment build number based on CI build number or timestamp
     build_number = ENV["GITHUB_RUN_NUMBER"] || Time.now.to_i.to_s
     
@@ -50,22 +57,55 @@ platform :ios do
     
     UI.message("Building version #{get_version_number(xcodeproj: 'lcc.xcodeproj')} (#{build_number})")
     
-    # Build the app
-    build_app(
+    # Common build configuration
+    common_config = {
       scheme: "lcc",
       project: "lcc.xcodeproj",
       clean: true,
-      export_method: "app-store",
-      export_options: {
-        provisioningProfiles: {
-          "live.lcc" => "match AppStore live.lcc"
-        }
-      },
-      output_directory: "./build",
-      output_name: "LCC.ipa",
       include_symbols: true,
       include_bitcode: false
-    )
+    }
+    
+    # Check if match is configured (for App Store builds)
+    use_match = !ENV["MATCH_GIT_URL"].nil? && !ENV["MATCH_GIT_URL"].empty?
+    skip_export = options[:skip_export] || false
+    
+    if use_match && !skip_export
+      # App Store build with match provisioning
+      UI.message("Using match for code signing")
+      build_app(
+        common_config.merge(
+          export_method: "app-store",
+          export_options: {
+            provisioningProfiles: {
+              "live.lcc" => "match AppStore live.lcc"
+            }
+          },
+          output_directory: "./build",
+          output_name: "LCC.ipa"
+        )
+      )
+    elsif skip_export
+      # Just build archive without exporting (for local testing)
+      UI.message("Building archive only (skipping export)")
+      build_app(
+        common_config.merge(
+          skip_archive: false,
+          skip_codesigning: false,
+          skip_package_ipa: true
+        )
+      )
+    else
+      # Use automatic signing (for local development)
+      UI.message("Using automatic code signing")
+      build_app(
+        common_config.merge(
+          export_method: "development",
+          output_directory: "./build",
+          output_name: "LCC.ipa"
+        )
+      )
+    end
     
     UI.success("✅ Build completed successfully!")
   end
@@ -127,7 +167,7 @@ platform :ios do
   end
   
   desc "Register new device"
-  lane :register_device do |options|
+  lane :add_device do |options|
     device_name = options[:name]
     device_udid = options[:udid]
     

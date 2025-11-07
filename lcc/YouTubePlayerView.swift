@@ -89,7 +89,7 @@ struct YouTubeThumbnailView: View {
                 placeholderView
             }
             
-            // Enhanced play button overlay with Liquid Glass
+            // Enhanced play button overlay with native glass effect
             Button(action: {}) {
                 Image(systemName: "play.fill")
                     .font(.system(size: 24, weight: .medium))
@@ -97,10 +97,11 @@ struct YouTubeThumbnailView: View {
                     .offset(x: 2) // Slight offset to visually center the play icon
             }
             .frame(width: 60, height: 60)
-            .liquidGlass(
-                tint: Color.white.opacity(0.15),
-                in: Circle(),
-                isInteractive: true
+            .glassEffect(
+                Glass.regular
+                    .tint(Color.white.opacity(0.15))
+                    .interactive(true),
+                in: Circle()
             )
             .disabled(true) // Disabled since this is just a thumbnail
         }
@@ -130,8 +131,9 @@ struct YouTubeThumbnailView: View {
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.6))
             }
-            .liquidGlass(
-                tint: Color.white.opacity(0.1),
+            .glassEffect(
+                Glass.regular
+                    .tint(Color.white.opacity(0.1)),
                 in: RoundedRectangle(cornerRadius: 12)
             )
             .padding()
@@ -140,23 +142,7 @@ struct YouTubeThumbnailView: View {
     }
     
     private func extractThumbnailURL() {
-        // Extract video ID from embed URL
-        if let videoID = extractVideoID(from: embedURL) {
-            // YouTube thumbnail URL format
-            thumbnailURL = URL(string: "https://img.youtube.com/vi/\(videoID)/mqdefault.jpg")
-        }
-    }
-    
-    private func extractVideoID(from urlString: String) -> String? {
-        if let url = URL(string: urlString) {
-            // From embed URL: youtube.com/embed/VIDEO_ID
-            if url.path.contains("/embed/") {
-                let components = url.path.components(separatedBy: "/")
-                if let videoID = components.last, !videoID.isEmpty {
-                    return videoID
-                }
-            }
-        }
-        return nil
+        // Extract thumbnail URL using YouTubeURLHelper
+        thumbnailURL = YouTubeURLHelper.thumbnailURL(from: embedURL)
     }
 }

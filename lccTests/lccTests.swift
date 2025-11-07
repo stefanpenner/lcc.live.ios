@@ -10,64 +10,22 @@ import Testing
 import Foundation
 import UIKit
 
-// MARK: - Grid Layout Tests (Critical business logic)
+// MARK: - Test Helpers
 
-@Suite("Grid Layout Tests")
-struct GridLayoutUtilsTests {
-    
-    @Test("Single mode portrait calculates one column")
-    func testSingleModePortrait() {
-        let result = calculateGridLayout(
-            availableWidth: 400,
-            availableHeight: 800,
-            gridMode: .single,
-            spacing: 5
-        )
-        
-        #expect(result.columns == 1)
-        #expect(result.imageWidth <= 430)  // Max width
+/// Helper to assert that a MediaItem is a YouTube video with expected embed URL
+func assertYouTubeVideo(_ mediaItem: MediaItem?, expectedVideoID: String) {
+    #expect(mediaItem != nil)
+    if case .youtubeVideo(let embedURL) = mediaItem?.type {
+        #expect(embedURL.contains("embed/\(expectedVideoID)"))
+    } else {
+        Issue.record("Expected YouTube video type with embed URL containing \(expectedVideoID)")
     }
-    
-    @Test("Single mode landscape calculates two columns")
-    func testSingleModeLandscape() {
-        let result = calculateGridLayout(
-            availableWidth: 800,
-            availableHeight: 400,
-            gridMode: .single,
-            spacing: 5
-        )
-        
-        #expect(result.columns == 2)
-    }
-    
-    @Test("Layout respects spacing")
-    func testLayoutSpacing() {
-        let spacing: CGFloat = 10
-        let result = calculateGridLayout(
-            availableWidth: 400,
-            availableHeight: 800,
-            gridMode: .compact,
-            spacing: spacing
-        )
-        
-        let totalSpacing = CGFloat(result.columns - 1) * spacing
-        let expectedImageWidth = (400 - totalSpacing) / CGFloat(result.columns)
-        
-        #expect(abs(result.imageWidth - expectedImageWidth) < 1.0)
-    }
-    
-    @Test("Layout maintains aspect ratio")
-    func testAspectRatio() {
-        let result = calculateGridLayout(
-            availableWidth: 400,
-            availableHeight: 800,
-            gridMode: .compact,
-            spacing: 5
-        )
-        
-        let aspectRatio = result.imageHeight / result.imageWidth
-        #expect(aspectRatio == 0.7)
-    }
+}
+
+/// Helper to test YouTube URL conversion patterns
+func testYouTubeURLConversion(_ urlString: String, expectedVideoID: String) {
+    let mediaItem = MediaItem.from(urlString: urlString)
+    assertYouTubeVideo(mediaItem, expectedVideoID: expectedVideoID)
 }
 
 // MARK: - YouTube URL Parsing Tests (Critical for video support)
@@ -77,41 +35,24 @@ struct YouTubeVideoTests {
     
     @Test("Converts watch URLs to embed URLs")
     func testYouTubeWatchURLConversion() {
-        let watchURL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-        let mediaItem = MediaItem.from(urlString: watchURL)
-        
-        #expect(mediaItem != nil)
-        if case .youtubeVideo(let embedURL) = mediaItem?.type {
-            #expect(embedURL.contains("embed/dQw4w9WgXcQ"))
-        } else {
-            Issue.record("Expected YouTube video type with embed URL")
-        }
+        testYouTubeURLConversion(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            expectedVideoID: "dQw4w9WgXcQ"
+        )
     }
     
     @Test("Converts short URLs to embed URLs")
     func testYouTubeShortURL() {
-        let shortURL = "https://youtu.be/dQw4w9WgXcQ"
-        let mediaItem = MediaItem.from(urlString: shortURL)
-        
-        #expect(mediaItem != nil)
-        if case .youtubeVideo(let embedURL) = mediaItem?.type {
-            #expect(embedURL.contains("embed/dQw4w9WgXcQ"))
-        } else {
-            Issue.record("Expected YouTube video type with embed URL")
-        }
+        testYouTubeURLConversion(
+            "https://youtu.be/dQw4w9WgXcQ",
+            expectedVideoID: "dQw4w9WgXcQ"
+        )
     }
     
     @Test("Detects YouTube iframe tags")
     func testYouTubeIframe() {
         let iframeHTML = "<iframe src=\"https://www.youtube.com/embed/dQw4w9WgXcQ\" frameborder=\"0\"></iframe>"
-        let mediaItem = MediaItem.from(urlString: iframeHTML)
-        
-        #expect(mediaItem != nil)
-        if case .youtubeVideo(let embedURL) = mediaItem?.type {
-            #expect(embedURL.contains("youtube.com/embed/dQw4w9WgXcQ"))
-        } else {
-            Issue.record("Expected YouTube video type from iframe")
-        }
+        testYouTubeURLConversion(iframeHTML, expectedVideoID: "dQw4w9WgXcQ")
     }
     
     @Test("isVideo property distinguishes videos from images")

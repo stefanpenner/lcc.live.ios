@@ -1,72 +1,5 @@
 import SwiftUI
 
-/// Visual indicator for network connection status
-struct ConnectionStatusView: View {
-    @EnvironmentObject var networkMonitor: NetworkMonitor
-    @EnvironmentObject var apiService: APIService
-    @Binding var showDetails: Bool
-    
-    var body: some View {
-        HStack(spacing: 6) {
-            // Connection status indicator
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-                .shadow(color: statusColor.opacity(0.5), radius: 2)
-            
-            Text(statusText)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
-            
-            if apiService.error != nil {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 10))
-                    .foregroundColor(.orange)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .liquidGlass(
-            tint: statusColor,
-            in: Capsule(),
-            isInteractive: true
-        )
-        .onTapGesture {
-            withAnimation(.spring(response: 0.3)) {
-                showDetails.toggle()
-            }
-        }
-        .popover(isPresented: $showDetails) {
-            ConnectionDetailsView()
-                .presentationCompactAdaptation(.popover)
-        }
-    }
-    
-    private var statusColor: Color {
-        if !networkMonitor.isConnected {
-            return .red
-        } else if apiService.error != nil {
-            return .orange
-        } else if apiService.isLoading {
-            return .yellow
-        } else {
-            return .green
-        }
-    }
-    
-    private var statusText: String {
-        if !networkMonitor.isConnected {
-            return "Offline"
-        } else if apiService.error != nil {
-            return "Error"
-        } else if apiService.isLoading {
-            return "Updating..."
-        } else {
-            return "Live"
-        }
-    }
-}
-
 /// Detailed connection information popover
 struct ConnectionDetailsView: View {
     @EnvironmentObject var networkMonitor: NetworkMonitor
@@ -224,7 +157,7 @@ struct StatusRow: View {
     let preloader = ImagePreloader()
     let networkMonitor = NetworkMonitor()
     
-    return ConnectionStatusView(showDetails: .constant(false))
+    return ConnectionDetailsView()
         .environmentObject(apiService)
         .environmentObject(preloader)
         .environmentObject(networkMonitor)
