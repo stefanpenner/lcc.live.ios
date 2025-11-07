@@ -317,9 +317,19 @@ class APIService: ObservableObject {
     /// Extract URL string from a single object
     private func extractURL(from object: [String: Any]) -> String? {
         // Check common URL field names in order of preference
-        if let iframe = object["iframe"] as? String { return iframe }
-        if let url = object["url"] as? String { return url }
-        if let src = object["src"] as? String { return src }
+        if let iframe = object["iframe"] as? String {
+            logger.debug("📹 Extracted iframe URL: \(iframe)")
+            return iframe
+        }
+        if let url = object["url"] as? String {
+            logger.debug("🔗 Extracted url: \(url)")
+            return url
+        }
+        if let src = object["src"] as? String {
+            let kind = object["kind"] as? String ?? "unknown"
+            logger.debug("📹 Extracted src (kind=\(kind)): \(src)")
+            return src
+        }
         return nil
     }
     

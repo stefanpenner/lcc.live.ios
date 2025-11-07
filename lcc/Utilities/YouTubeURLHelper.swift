@@ -14,27 +14,52 @@ enum YouTubeURLHelper {
     static func extractVideoID(from urlString: String) -> String? {
         // Pattern 1: Embed URL (youtube.com/embed/VIDEO_ID)
         if urlString.contains("youtube.com/embed/") {
+            // Try parsing as URL first
             if let url = URL(string: urlString) {
                 let videoID = url.lastPathComponent.components(separatedBy: "?").first
-                if let videoID = videoID, !videoID.isEmpty {
+                if let videoID = videoID, !videoID.isEmpty, videoID != "embed" {
                     return videoID
                 }
             }
-            // Also check for embed URL in iframe tags
-            if let range = urlString.range(of: "youtube\\.com/embed/[a-zA-Z0-9_-]+", options: .regularExpression) {
-                let embedPath = String(urlString[range])
-                if let url = URL(string: "https://www.\(embedPath)") {
-                    return url.lastPathComponent.components(separatedBy: "?").first
+            // Also try with https:// prefix if missing
+            if !urlString.hasPrefix("http://") && !urlString.hasPrefix("https://") {
+                if let url = URL(string: "https://\(urlString)") {
+                    let videoID = url.lastPathComponent.components(separatedBy: "?").first
+                    if let videoID = videoID, !videoID.isEmpty, videoID != "embed" {
+                        return videoID
+                    }
+                }
+            }
+            // Also check for embed URL in iframe tags or plain text using regex
+            // Extract video ID directly using regex pattern
+            if let regex = try? NSRegularExpression(pattern: "youtube\\.com/embed/([a-zA-Z0-9_-]+)", options: []),
+               let match = regex.firstMatch(in: urlString, options: [], range: NSRange(urlString.startIndex..., in: urlString)),
+               match.numberOfRanges > 1 {
+                let videoIDRange = Range(match.range(at: 1), in: urlString)!
+                let videoID = String(urlString[videoIDRange])
+                if !videoID.isEmpty {
+                    return videoID
                 }
             }
         }
         
         // Pattern 2: Watch URL (youtube.com/watch?v=VIDEO_ID)
         if urlString.contains("youtube.com/watch") {
+            // Try parsing as URL with components
             if let url = URL(string: urlString),
                let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-               let videoID = components.queryItems?.first(where: { $0.name == "v" })?.value {
+               let videoID = components.queryItems?.first(where: { $0.name == "v" })?.value,
+               !videoID.isEmpty {
                 return videoID
+            }
+            // Also try with https:// prefix if missing
+            if !urlString.hasPrefix("http://") && !urlString.hasPrefix("https://") {
+                if let url = URL(string: "https://\(urlString)"),
+                   let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                   let videoID = components.queryItems?.first(where: { $0.name == "v" })?.value,
+                   !videoID.isEmpty {
+                    return videoID
+                }
             }
         }
         
@@ -44,6 +69,15 @@ enum YouTubeURLHelper {
                 let videoID = url.lastPathComponent.components(separatedBy: "?").first
                 if let videoID = videoID, !videoID.isEmpty {
                     return videoID
+                }
+            }
+            // Also try with https:// prefix if missing
+            if !urlString.hasPrefix("http://") && !urlString.hasPrefix("https://") {
+                if let url = URL(string: "https://\(urlString)") {
+                    let videoID = url.lastPathComponent.components(separatedBy: "?").first
+                    if let videoID = videoID, !videoID.isEmpty {
+                        return videoID
+                    }
                 }
             }
         }
@@ -63,10 +97,22 @@ enum YouTubeURLHelper {
             }
         }
         
-        // Pattern 2: Direct embed URL
+        // Pattern 2: Direct embed URL (already in embed format)
         if urlString.contains("youtube.com/embed/") {
-            if let url = URL(string: urlString), url.host?.contains("youtube.com") ?? false {
-                return urlString
+            // Extract video ID to ensure it's valid
+            if let videoID = extractVideoID(from: urlString) {
+                // If URL already has proper scheme and is a valid embed URL, preserve it (including query params)
+                if urlString.hasPrefix("http://") || urlString.hasPrefix("https://") {
+                    // Validate the URL is properly formatted and contains the video ID
+                    if let url = URL(string: urlString),
+                       url.host?.contains("youtube.com") ?? false,
+                       url.path.contains("/embed/") {
+                        // Return the original URL to preserve any query parameters
+                        return urlString
+                    }
+                }
+                // Construct proper embed URL (without query params - they'll be added by the player)
+                return "https://www.youtube.com/embed/\(videoID)"
             }
         }
         

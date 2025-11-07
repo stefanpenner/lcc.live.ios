@@ -54,14 +54,16 @@ struct MainView: View {
                     ToolbarItemGroup(placement: .bottomBar) {
                         // Status button
                         Button {
-                            showConnectionDetails.toggle()
+                            showConnectionDetails = true
                         } label: {
                             Circle()
                                 .fill(statusColor)
-                                .frame(width: 8, height: 8)
+                                .frame(width: 10, height: 10)
                                 .shadow(color: statusColor.opacity(0.6), radius: 4)
+                                .padding(8)
                         }
-                        .popover(isPresented: $showConnectionDetails) {
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showConnectionDetails, attachmentAnchor: .point(.top)) {
                             ConnectionDetailsView()
                                 .presentationCompactAdaptation(.popover)
                         }
@@ -97,14 +99,16 @@ struct MainView: View {
                     ToolbarItemGroup(placement: .bottomBar) {
                         // Status button
                         Button {
-                            showConnectionDetails.toggle()
+                            showConnectionDetails = true
                         } label: {
                             Circle()
                                 .fill(statusColor)
-                                .frame(width: 8, height: 8)
+                                .frame(width: 10, height: 10)
                                 .shadow(color: statusColor.opacity(0.6), radius: 4)
+                                .padding(8)
                         }
-                        .popover(isPresented: $showConnectionDetails) {
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showConnectionDetails, attachmentAnchor: .point(.top)) {
                             ConnectionDetailsView()
                                 .presentationCompactAdaptation(.popover)
                         }
@@ -148,6 +152,12 @@ struct MainView: View {
                 initialIndex: currentMediaItems.firstIndex(where: { $0.url == presented.mediaItem.url }) ?? 0,
                 onClose: { fullScreenMedia = nil }
             )
+        }
+        .onChange(of: fullScreenMedia) { _, newValue in
+            // Close popover when navigating to full screen
+            if newValue != nil {
+                showConnectionDetails = false
+            }
         }
         .onChange(of: selectedTab) { refreshImagesTrigger += 1 }
         .onChange(of: scenePhase) { _, newPhase in if newPhase == .active { refreshImagesTrigger += 1 } }

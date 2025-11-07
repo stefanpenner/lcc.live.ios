@@ -22,9 +22,13 @@ struct MediaItem: Identifiable, Hashable {
     /// Parses a URL string to determine if it's an image or YouTube video
     static func from(urlString: String, identifier: String? = nil) -> MediaItem? {
         // Check if it's a YouTube URL
-        if let videoURL = YouTubeURLHelper.extractEmbedURL(from: urlString) {
-            Logger.ui.debug("✅ Detected YouTube video: \(urlString)")
-            return MediaItem(type: .youtubeVideo(embedURL: videoURL), url: urlString, identifier: identifier)
+        if YouTubeURLHelper.isYouTubeURL(urlString) {
+            if let videoURL = YouTubeURLHelper.extractEmbedURL(from: urlString) {
+                Logger.ui.debug("✅ Detected YouTube video: \(urlString) -> embed URL: \(videoURL)")
+                return MediaItem(type: .youtubeVideo(embedURL: videoURL), url: urlString, identifier: identifier)
+            } else {
+                Logger.ui.warning("⚠️ YouTube URL detected but failed to extract embed URL: \(urlString)")
+            }
         }
         
         // Default to image
