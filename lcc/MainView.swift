@@ -23,6 +23,7 @@ struct MainView: View {
     @State private var selectedTab: Tab = .lcc
     @State private var refreshImagesTrigger = 0
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var gridMode: PhotoTabView.GridMode = .single
     @State private var fullScreenMedia: PresentedMedia? = nil
     @State private var showConnectionDetails = false
@@ -37,6 +38,13 @@ struct MainView: View {
             hasError: apiService.error != nil,
             isLoading: apiService.isLoading
         )
+    }
+    
+    private var popoverAnchorPoint: UnitPoint {
+        // In landscape (regular width), position further from edge to account for wider screen
+        // In portrait (compact width), keep closer to left edge
+        let xOffset = horizontalSizeClass == .regular ? 0.08 : 0.1
+        return UnitPoint(x: xOffset, y: 0.95)
     }
     
     var body: some View {
@@ -63,10 +71,6 @@ struct MainView: View {
                                 .padding(8)
                         }
                         .buttonStyle(.plain)
-                        .popover(isPresented: $showConnectionDetails, attachmentAnchor: .point(.top)) {
-                            ConnectionDetailsView()
-                                .presentationCompactAdaptation(.popover)
-                        }
                         
                         Spacer()
                         
@@ -108,10 +112,6 @@ struct MainView: View {
                                 .padding(8)
                         }
                         .buttonStyle(.plain)
-                        .popover(isPresented: $showConnectionDetails, attachmentAnchor: .point(.top)) {
-                            ConnectionDetailsView()
-                                .presentationCompactAdaptation(.popover)
-                        }
                         
                         Spacer()
                         
@@ -132,6 +132,10 @@ struct MainView: View {
             }
         }
         .background(Color.black.ignoresSafeArea(.all))
+        .popover(isPresented: $showConnectionDetails, attachmentAnchor: .point(popoverAnchorPoint), arrowEdge: .bottom) {
+            ConnectionDetailsView()
+                .presentationCompactAdaptation(.popover)
+        }
         .overlay(alignment: .top) {
             LinearGradient(
                 gradient: Gradient(stops: [
@@ -159,7 +163,11 @@ struct MainView: View {
                 showConnectionDetails = false
             }
         }
-        .onChange(of: selectedTab) { refreshImagesTrigger += 1 }
+        .onChange(of: selectedTab) { _, _ in
+            // Close popover when switching tabs to prevent crashes
+            showConnectionDetails = false
+            refreshImagesTrigger += 1
+        }
         .onChange(of: scenePhase) { _, newPhase in if newPhase == .active { refreshImagesTrigger += 1 } }
     }
 }

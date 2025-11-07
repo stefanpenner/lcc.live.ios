@@ -6,6 +6,12 @@ struct MediaItem: Identifiable, Hashable {
     let type: MediaType
     let url: String
     let identifier: String?
+    let alt: String?
+    
+    /// Returns a display caption for the media item
+    var caption: String? {
+        return alt
+    }
     
     enum MediaType: Hashable {
         case image
@@ -20,19 +26,19 @@ struct MediaItem: Identifiable, Hashable {
     }
     
     /// Parses a URL string to determine if it's an image or YouTube video
-    static func from(urlString: String, identifier: String? = nil) -> MediaItem? {
+    static func from(urlString: String, identifier: String? = nil, alt: String? = nil) -> MediaItem? {
         // Check if it's a YouTube URL
         if YouTubeURLHelper.isYouTubeURL(urlString) {
             if let videoURL = YouTubeURLHelper.extractEmbedURL(from: urlString) {
                 Logger.ui.debug("✅ Detected YouTube video: \(urlString) -> embed URL: \(videoURL)")
-                return MediaItem(type: .youtubeVideo(embedURL: videoURL), url: urlString, identifier: identifier)
+                return MediaItem(type: .youtubeVideo(embedURL: videoURL), url: urlString, identifier: identifier, alt: alt)
             } else {
                 Logger.ui.warning("⚠️ YouTube URL detected but failed to extract embed URL: \(urlString)")
             }
         }
         
         // Default to image
-        return MediaItem(type: .image, url: urlString, identifier: identifier)
+        return MediaItem(type: .image, url: urlString, identifier: identifier, alt: alt)
     }
     
     // For Hashable conformance

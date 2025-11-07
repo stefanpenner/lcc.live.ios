@@ -13,7 +13,7 @@ struct MediaCell: View {
     @State private var isRetrying = false
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: .bottom) {
             Group {
                 if mediaItem.type.isVideo {
                     // Show YouTube thumbnail with play button
@@ -111,6 +111,35 @@ struct MediaCell: View {
                         .opacity(borderOpacity)
                         .animation(.easeInOut(duration: 0.4), value: borderOpacity)
                 }
+            }
+            
+            // Subtle caption overlay
+            if let caption = mediaItem.caption {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Text(caption)
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                        Spacer()
+                    }
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.black.opacity(0),
+                                Color.black.opacity(0.6)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                }
+                .frame(width: imageWidth, height: imageHeight)
+                .allowsHitTesting(false)
             }
         }
     }

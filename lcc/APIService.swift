@@ -271,7 +271,7 @@ class APIService: ObservableObject {
         return nil
     }
     
-    /// Extract a MediaItem from a single object, including identifier if available
+    /// Extract a MediaItem from a single object, including identifier and alt if available
     private func extractMediaItem(from object: [String: Any]) -> MediaItem? {
         // Extract URL
         guard let urlString = extractURL(from: object) else { return nil }
@@ -287,7 +287,17 @@ class APIService: ObservableObject {
             return nil
         }()
         
-        return MediaItem.from(urlString: urlString, identifier: identifier)
+        // Extract alt text (check common field names)
+        let alt: String? = {
+            if let alt = object["alt"] as? String { return alt }
+            if let alt = object["altText"] as? String { return alt }
+            if let alt = object["alt_text"] as? String { return alt }
+            if let alt = object["description"] as? String { return alt }
+            if let alt = object["title"] as? String { return alt }
+            return nil
+        }()
+        
+        return MediaItem.from(urlString: urlString, identifier: identifier, alt: alt)
     }
     
     /// Extract URLs from an array of objects

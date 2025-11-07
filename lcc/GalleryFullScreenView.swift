@@ -28,10 +28,43 @@ struct GalleryFullScreenView: View {
                 TabView(selection: $index) {
                     ForEach(items.indices, id: \.self) { i in
                         page(for: items[i])
-                            .tag(i)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(Color.black)
                             .ignoresSafeArea(edges: .all)
+                            .overlay(alignment: .bottom) {
+                                // Caption overlay - positioned at bottom without affecting image layout
+                                if let caption = items[i].caption {
+                                    VStack(spacing: 0) {
+                                        // Text content
+                                        HStack {
+                                            Text(caption)
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.white)
+                                                .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 2)
+                                                .padding(.horizontal, 20)
+                                                .padding(.vertical, 12)
+                                            Spacer()
+                                        }
+                                        .padding(.bottom, 50) // Space above bottom toolbar
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .background(
+                                        // Gradient extends from screen bottom
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [
+                                                Color.clear,
+                                                Color.black.opacity(0.4)
+                                            ]),
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                        .ignoresSafeArea(edges: .bottom)
+                                    )
+                                    .allowsHitTesting(false)
+                                }
+                            }
+                            .tag(i)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
