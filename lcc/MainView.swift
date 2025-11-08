@@ -156,6 +156,7 @@ struct MainView: View {
                 initialIndex: currentMediaItems.firstIndex(where: { $0.url == presented.mediaItem.url }) ?? 0,
                 onClose: { fullScreenMedia = nil }
             )
+            .environmentObject(preloader)
         }
         .onChange(of: fullScreenMedia) { _, newValue in
             // Close popover when navigating to full screen

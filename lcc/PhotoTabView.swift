@@ -137,8 +137,8 @@ struct PhotoTabView: View {
             logger.info("📱 PhotoTabView appeared with \(mediaItems.count) media items")
             logger.debug("Initial state - hasReceivedPayload: \(hasReceivedInitialPayload), hasCompletedLoad: \(hasCompletedInitialLoad)")
             
+            // Only preload, don't force refresh on appear (refresh happens via background timer)
             preloader.preloadMedia(from: mediaItems)
-            preloader.refreshImages()
             
             // Check completion status periodically
             Task { @MainActor in
