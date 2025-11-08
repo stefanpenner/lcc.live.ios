@@ -89,7 +89,8 @@ struct PhotoTabView: View {
                 .modifier(ZeroScrollContentMarginsIfAvailable())
                 
                 // Unified loading overlay during initial load
-                if !hasCompletedInitialLoad && !mediaItems.isEmpty {
+                // Show loading screen only until API responds, not until images load
+                if !hasReceivedInitialPayload {
                     VStack(spacing: 0) {
                         InitialLoadingView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -171,8 +172,10 @@ struct PhotoTabView: View {
             
             // Mark that we've received API payload once we have items
             if !isEmpty && !hasReceivedInitialPayload {
-                logger.info("📦 Received API payload with \(mediaItems.count) items")
+                logger.info("📦 Received API payload with \(mediaItems.count) items - hiding loading screen")
                 hasReceivedInitialPayload = true
+                // Hide loading screen immediately when API data arrives (like web)
+                hasCompletedInitialLoad = true
             }
         }
         .onChange(of: apiService.isLoading) { _, isLoading in
@@ -180,14 +183,10 @@ struct PhotoTabView: View {
             
             // Mark payload received when API completes (whether we have items or not)
             if !isLoading && !hasReceivedInitialPayload {
-                logger.info("📦 API loading completed - mediaItems: \(mediaItems.count)")
+                logger.info("📦 API loading completed - mediaItems: \(mediaItems.count) - hiding loading screen")
                 hasReceivedInitialPayload = true
-                
-                // If API loading completes with no images, mark initial load as done
-                if mediaItems.isEmpty {
-                    logger.info("⚠️ No media items after API load - completing initial load")
-                    hasCompletedInitialLoad = true
-                }
+                // Hide loading screen immediately when API completes (like web)
+                hasCompletedInitialLoad = true
             }
         }
     }

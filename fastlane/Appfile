@@ -1,6 +1,6 @@
 # Appfile for LCC.live
 
-app_identifier("live.lcc") # The bundle identifier of your app
+app_identifier("lcc.live") # The bundle identifier of your app
 apple_id(ENV["APPLE_ID"]) # Your Apple ID email address
 
 itc_team_id(ENV["ITC_TEAM_ID"]) # App Store Connect Team ID

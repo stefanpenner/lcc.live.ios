@@ -78,7 +78,7 @@ platform :ios do
           export_method: "app-store",
           export_options: {
             provisioningProfiles: {
-              "live.lcc" => "match AppStore live.lcc"
+              "lcc.live" => "match AppStore lcc.live"
             }
           },
           output_directory: "./build",
@@ -112,6 +112,53 @@ platform :ios do
   
   desc "Upload to TestFlight"
   lane :beta do
+    # Build the app first (creates IPA file for App Store)
+    # Increment build number
+    build_number = ENV["GITHUB_RUN_NUMBER"] || Time.now.to_i.to_s
+    
+    increment_build_number(
+      build_number: build_number,
+      xcodeproj: "lcc.xcodeproj"
+    )
+    
+    UI.message("Building version #{get_version_number(xcodeproj: 'lcc.xcodeproj')} (#{build_number})")
+    
+    # Check if match is configured (for App Store builds)
+    use_match = !ENV["MATCH_GIT_URL"].nil? && !ENV["MATCH_GIT_URL"].empty?
+    
+    if use_match
+      # App Store build with match provisioning
+      UI.message("Using match for code signing")
+      build_app(
+        scheme: "lcc",
+        project: "lcc.xcodeproj",
+        clean: true,
+        include_symbols: true,
+        include_bitcode: false,
+        export_method: "app-store",
+        export_options: {
+          provisioningProfiles: {
+            "lcc.live" => "match AppStore lcc.live"
+          }
+        },
+        output_directory: "./build",
+        output_name: "LCC.ipa"
+      )
+    else
+      # App Store build with automatic signing (requires proper provisioning profile in Xcode)
+      UI.message("Using automatic code signing for App Store")
+      build_app(
+        scheme: "lcc",
+        project: "lcc.xcodeproj",
+        clean: true,
+        include_symbols: true,
+        include_bitcode: false,
+        export_method: "app-store",
+        output_directory: "./build",
+        output_name: "LCC.ipa"
+      )
+    end
+    
     # Use App Store Connect API for authentication
     api_key = app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
@@ -124,13 +171,14 @@ platform :ios do
     # Upload to TestFlight
     upload_to_testflight(
       api_key: api_key,
+      ipa: "./build/LCC.ipa",
       skip_submission: false,
       skip_waiting_for_build_processing: false,
       distribute_external: true,
       notify_external_testers: true,
       changelog: "New build from CI/CD",
-      groups: ["Beta Testers"],
-      app_identifier: "live.lcc"
+      groups: ["Beta Testers"]
+      # app_identifier is automatically read from Appfile
     )
     
     UI.success("✅ Successfully uploaded to TestFlight!")
@@ -161,7 +209,7 @@ platform :ios do
   lane :setup_signing do
     match(
       type: "appstore",
-      app_identifier: "live.lcc",
+      app_identifier: "lcc.live",
       readonly: is_ci
     )
   end

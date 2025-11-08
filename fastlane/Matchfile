@@ -5,7 +5,7 @@ storage_mode("git")
 
 type("appstore") # Can be appstore, adhoc, development, enterprise
 
-app_identifier(["live.lcc"])
+app_identifier(["lcc.live"])
 username(ENV["APPLE_ID"])
 team_id(ENV["TEAM_ID"])
 

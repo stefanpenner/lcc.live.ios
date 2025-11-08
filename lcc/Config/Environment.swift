@@ -73,7 +73,7 @@ enum AppEnvironment {
     
     /// Bundle identifier
     static var bundleIdentifier: String {
-        Bundle.main.bundleIdentifier ?? "live.lcc"
+        Bundle.main.bundleIdentifier ?? "lcc.live"
     }
     
     // MARK: - Feature Flags
