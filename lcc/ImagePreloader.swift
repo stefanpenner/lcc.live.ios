@@ -253,9 +253,10 @@ class ImagePreloader: ObservableObject {
     
     /// Queue all images for refresh (called every refreshInterval seconds)
     private func queueBackgroundRefresh() {
-        // Add all URLs to queue if not already queued and cache is still valid
+        // Add all URLs to queue if not already queued or loading
+        // Don't skip expired entries — live camera feeds should always be re-checked
         let urlsToQueue = urls.filter { url in
-            !refreshQueue.contains(url) && !loading.contains(url) && isCacheValid(for: url)
+            !refreshQueue.contains(url) && !loading.contains(url)
         }
         
         // Prioritize recently accessed images
@@ -502,18 +503,18 @@ class ImagePreloader: ObservableObject {
                 
                 let isFirstLoad = !self.hasLoadedOnce.contains(url)
                 
-                // Don't cache images with no-cache/no-store headers (Date.distantPast)
-                // These should not be stored since they're immediately invalid
+                // For no-cache/no-store: display the image but treat as hot cache
+                // so the background timer re-fetches it on the next cycle.
+                // (Previously this discarded the image entirely, causing shimmer forever.)
                 if expirationDate == Date.distantPast {
-                    // Remove any existing cache entry
-                    self.loadedImages.removeValue(forKey: url)
-                    self.cacheExpirationDates.removeValue(forKey: url)
-                    self.etags.removeValue(forKey: url)
-                    self.lastModifieds.removeValue(forKey: url)
-                    self.cacheAccessTimes.removeValue(forKey: url)
+                    self.loadedImages[url] = decompressedImage ?? image
+                    self.cacheExpirationDates.removeValue(forKey: url) // hot cache → always re-queued
+                    self.recordAccess(for: url)
+                    self.lastRefreshed = Date()
+                    self.hasLoadedOnce.insert(url)
                     self.loading.remove(url)
-                    self.hasLoadedOnce.remove(url)
-                    // Don't store the image - it will be reloaded every time
+                    if let newEtag = newEtag { self.etags[url] = newEtag }
+                    if let newLastModified = newLastModified { self.lastModifieds[url] = newLastModified }
                     return
                 }
                 
@@ -534,14 +535,14 @@ class ImagePreloader: ObservableObject {
                     tags: ["changed": changed ? "true" : "false"]
                 )
                 
+                // Always clear loading state — previously it was never cleared on first load,
+                // which caused the background refresh timer to skip the URL forever.
+                self.loading.remove(url)
                 if changed && !isFirstLoad {
-                    self.loading.remove(url)
                     self.fadingOut[url] = Date()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         self.fadingOut.removeValue(forKey: url)
                     }
-                } else if !isFirstLoad {
-                    self.loading.remove(url)
                 }
                 
                 if let newEtag = newEtag { self.etags[url] = newEtag }

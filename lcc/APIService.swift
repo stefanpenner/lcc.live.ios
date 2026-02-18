@@ -12,6 +12,10 @@ class APIService: ObservableObject {
     private var timer: Timer?
     private let logger = Logger(category: .networking)
     
+    // Track errors per endpoint to avoid clearing one endpoint's error when another succeeds
+    private var lccError: Error?
+    private var bccError: Error?
+    
     private var baseURL: String {
         AppEnvironment.apiBaseURL
     }
@@ -96,6 +100,11 @@ class APIService: ObservableObject {
     
     /// Fetch all media from both endpoints
     func fetchAllImages() async {
+        await MainActor.run {
+            self.isLoading = true
+            self.error = nil // Clear previous errors
+        }
+        
         await withTaskGroup(of: Void.self) { group in
             group.addTask {
                 await self.fetchLCCMedia()
@@ -103,6 +112,10 @@ class APIService: ObservableObject {
             group.addTask {
                 await self.fetchBCCMedia()
             }
+        }
+        
+        await MainActor.run {
+            self.isLoading = false
         }
     }
     
@@ -123,8 +136,11 @@ class APIService: ObservableObject {
     
     /// Generic method to fetch media from an endpoint
     private func fetchMedia(from urlString: String, updateType: UpdateType) async {
+        let endpointName = updateType == .lcc ? "LCC" : "BCC"
+        logger.info("🔄 Fetching \(endpointName) media from \(urlString)")
+        
         guard let url = URL(string: urlString) else {
-            logger.error("Invalid URL: \(urlString)")
+            logger.error("❌ Invalid URL: \(urlString)")
             return
         }
         
@@ -151,8 +167,12 @@ class APIService: ObservableObject {
             }
             
             guard httpResponse.statusCode == 200 else {
+                logger.error("❌ \(endpointName) HTTP error: \(httpResponse.statusCode)")
                 throw APIError.httpError(statusCode: httpResponse.statusCode)
             }
+            
+            // Log response size for debugging
+            logger.debug("📦 \(endpointName) response: \(data.count) bytes, Content-Type: \(httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "unknown")")
             
             // Update server version from response headers
             if updateType == .lcc {
@@ -169,18 +189,28 @@ class APIService: ObservableObject {
             // Parse JSON - expecting array of strings or objects
             let mediaItems = try parseMediaItems(from: data)
             
+            if mediaItems.isEmpty {
+                logger.warning("⚠️ \(endpointName) returned empty media items array")
+            }
+            
             await MainActor.run {
                 // Mark that we successfully fetched from API
                 self.isUsingFallback = false
                 
+                // Clear error for this specific endpoint on success
                 switch updateType {
                 case .lcc:
                     self.lccMedia = mediaItems
+                    self.lccError = nil
                     self.logger.info("✅ Fetched \(mediaItems.count) LCC media items from API")
                 case .bcc:
                     self.bccMedia = mediaItems
+                    self.bccError = nil
                     self.logger.info("✅ Fetched \(mediaItems.count) BCC media items from API")
                 }
+                
+                // Update the published error to reflect the most recent error (if any)
+                self.error = self.bccError ?? self.lccError
             }
         } catch {
             // Track API failure
@@ -194,13 +224,27 @@ class APIService: ObservableObject {
                 ]
             )
             
-            logger.error("⚠️ Error fetching media from \(urlString)", error: error)
+            let endpointName = updateType == .lcc ? "LCC" : "BCC"
+            logger.error("⚠️ Error fetching \(endpointName) media from \(urlString)", error: error)
+            
             if self.isUsingFallback {
                 logger.info("ℹ️ Using fallback data")
             }
             
             await MainActor.run {
+                // Track error per endpoint
+                switch updateType {
+                case .lcc:
+                    self.lccError = error
+                case .bcc:
+                    self.bccError = error
+                }
+                
+                // Update published error to show the most recent error
                 self.error = error
+                
+                // Log which endpoint failed for debugging
+                logger.warning("❌ \(endpointName) fetch failed: \(error.localizedDescription)")
             }
         }
     }

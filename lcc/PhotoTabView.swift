@@ -137,10 +137,24 @@ struct PhotoTabView: View {
         .onAppear {
             logger.info("📱 PhotoTabView appeared with \(mediaItems.count) media items")
             logger.debug("Initial state - hasReceivedPayload: \(hasReceivedInitialPayload), hasCompletedLoad: \(hasCompletedInitialLoad)")
-            
+
             // Only preload, don't force refresh on appear (refresh happens via background timer)
             preloader.preloadMedia(from: mediaItems)
-            
+
+            // Check current state immediately — handles the case where data is already loaded
+            // when this tab view first appears (e.g., switching to BCC after LCC already loaded)
+            if !hasReceivedInitialPayload {
+                if !mediaItems.isEmpty {
+                    logger.info("📦 Tab appeared with \(mediaItems.count) existing items - hiding loading screen immediately")
+                    hasReceivedInitialPayload = true
+                    hasCompletedInitialLoad = true
+                } else if !apiService.isLoading {
+                    logger.info("📦 API already done loading (empty result) - hiding loading screen")
+                    hasReceivedInitialPayload = true
+                    hasCompletedInitialLoad = true
+                }
+            }
+
             // Check completion status periodically
             Task { @MainActor in
                 for iteration in 0..<50 { // Check every 100ms for up to 5 seconds
@@ -151,11 +165,12 @@ struct PhotoTabView: View {
                         break
                     }
                 }
-                
+
                 // Safety timeout: mark initial load as complete after 5 seconds regardless
                 if !hasCompletedInitialLoad {
                     logger.warning("⏱️ Safety timeout triggered - forcing initial load completion")
                     withAnimation(.easeOut(duration: 0.4)) {
+                        hasReceivedInitialPayload = true
                         hasCompletedInitialLoad = true
                     }
                 }
