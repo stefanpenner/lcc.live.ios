@@ -1,31 +1,39 @@
 import Foundation
 import UIKit
+import Observation
 
-class ImagePreloader: ObservableObject {
-    @Published var loadedImages: [URL: UIImage] = [:]
-    @Published var lastRefreshed: Date = .init()
-    @Published var loading: Set<URL> = []
-    @Published var fadingOut: [URL: Date] = [:]
-    private var urls: [URL] = []
-    private var timer: Timer?
-    private var etags: [URL: String] = [:]
-    private var lastModifieds: [URL: String] = [:]
-    private var hasLoadedOnce: Set<URL> = []
-    private var cacheExpirationDates: [URL: Date] = [:]
-    private let logger = Logger(category: .imageLoading)
-    
-    private var refreshInterval: TimeInterval {
+@Observable
+@MainActor
+class ImagePreloader {
+    var loadedImages: [URL: UIImage] = [:]
+    var lastRefreshed: Date = .init()
+    var loading: Set<URL> = []
+    var fadingOut: [URL: Date] = [:]
+
+    @ObservationIgnored private var urls: [URL] = []
+    @ObservationIgnored private var etags: [URL: String] = [:]
+    @ObservationIgnored private var lastModifieds: [URL: String] = [:]
+    @ObservationIgnored private var hasLoadedOnce: Set<URL> = []
+    @ObservationIgnored private var cacheExpirationDates: [URL: Date] = [:]
+    @ObservationIgnored private let logger = Logger(category: .imageLoading)
+
+    @ObservationIgnored private var refreshInterval: TimeInterval {
         AppEnvironment.imageRefreshInterval
     }
-    
+
     // Memory management
-    private let maxCachedImages = 100
-    private var cacheAccessTimes: [URL: Date] = [:]
-    
+    @ObservationIgnored private let maxCachedImages = 100
+    @ObservationIgnored private var cacheAccessTimes: [URL: Date] = [:]
+
     // Efficient refresh queue
-    private var refreshQueue: [URL] = []
-    private let maxConcurrentLoads = 6 // Increased for better throughput
-    private let batchRefreshInterval: TimeInterval = 0.5 // Process queue every 500ms
+    @ObservationIgnored private var refreshQueue: [URL] = []
+    @ObservationIgnored private let maxConcurrentLoads = 6
+    @ObservationIgnored private let batchRefreshInterval: TimeInterval = 0.5
+
+    // Task-based polling (replaces 3 Timers)
+    @ObservationIgnored private var refreshCycleTask: Task<Void, Never>?
+    @ObservationIgnored private var batchProcessorTask: Task<Void, Never>?
+    @ObservationIgnored private var cacheCleanupTask: Task<Void, Never>?
 
     init() {
         startBackgroundRefresh()
@@ -33,124 +41,110 @@ class ImagePreloader: ObservableObject {
     }
 
     deinit {
-        timer?.invalidate()
+        refreshCycleTask?.cancel()
+        batchProcessorTask?.cancel()
+        cacheCleanupTask?.cancel()
         NotificationCenter.default.removeObserver(self)
     }
-    
+
     // MARK: - Memory Management
-    
+
     private func setupMemoryWarningHandler() {
         NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleMemoryWarning()
+            Task { @MainActor in
+                self?.handleMemoryWarning()
+            }
         }
     }
-    
+
     private func handleMemoryWarning() {
         logger.warning("Memory warning received - clearing image cache")
-        
+
         // Keep only the most recently accessed images
         let sortedByAccess = cacheAccessTimes.sorted { $0.value > $1.value }
         let urlsToKeep = Set(sortedByAccess.prefix(20).map { $0.key })
-        
+
         loadedImages = loadedImages.filter { urlsToKeep.contains($0.key) }
         cacheAccessTimes = cacheAccessTimes.filter { urlsToKeep.contains($0.key) }
         cacheExpirationDates = cacheExpirationDates.filter { urlsToKeep.contains($0.key) }
-        
+
         logger.info("Cleared cache, kept \(loadedImages.count) images")
-        
-        // Track memory warning
+
         MetricsService.shared.track(event: .memoryWarning, tags: ["source": "image_cache"])
     }
-    
+
     private func pruneCache() {
         guard loadedImages.count > maxCachedImages else { return }
-        
-        // Do pruning off main thread to avoid blocking
+
         let imagesToRemove = loadedImages.count - maxCachedImages
         let sortedByAccess = cacheAccessTimes.sorted { $0.value < $1.value }
         let urlsToRemove = sortedByAccess.prefix(imagesToRemove).map { $0.key }
-        
-        DispatchQueue.main.async {
-            for url in urlsToRemove {
-                self.loadedImages.removeValue(forKey: url)
-                self.cacheAccessTimes.removeValue(forKey: url)
-                self.cacheExpirationDates.removeValue(forKey: url)
-            }
-            
-            self.logger.debug("Pruned cache: removed \(urlsToRemove.count) images")
+
+        for url in urlsToRemove {
+            loadedImages.removeValue(forKey: url)
+            cacheAccessTimes.removeValue(forKey: url)
+            cacheExpirationDates.removeValue(forKey: url)
         }
+
+        logger.debug("Pruned cache: removed \(urlsToRemove.count) images")
     }
-    
+
     func recordAccess(for url: URL) {
         cacheAccessTimes[url] = Date()
     }
-    
+
     // MARK: - Cache Expiration
-    
-    /// Check if a cached image is still valid based on HTTP cache headers
+
     private func isCacheValid(for url: URL) -> Bool {
         guard let expirationDate = cacheExpirationDates[url] else {
-            // No expiration date means "hot" cache - always valid (no HTTP cache headers provided)
             return true
         }
-        // If expiration date is in the distant future, treat as "hot" cache
         if expirationDate == Date.distantFuture {
             return true
         }
         return Date() < expirationDate
     }
-    
-    /// Remove expired cache entries
+
     private func cleanupExpiredCache() {
         let now = Date()
         let expiredURLs: [URL] = cacheExpirationDates.compactMap { url, expirationDate in
-            // Skip "hot" cache entries (no expiration) and only remove actually expired ones
             if expirationDate == Date.distantFuture {
                 return nil
             }
             return now >= expirationDate ? url : nil
         }
-        
+
         guard !expiredURLs.isEmpty else { return }
-        
-        DispatchQueue.main.async {
-            for url in expiredURLs {
-                self.loadedImages.removeValue(forKey: url)
-                self.cacheExpirationDates.removeValue(forKey: url)
-                self.cacheAccessTimes.removeValue(forKey: url)
-                self.etags.removeValue(forKey: url)
-                self.lastModifieds.removeValue(forKey: url)
-            }
-            
-            self.logger.debug("Cleaned up \(expiredURLs.count) expired cache entries")
+
+        for url in expiredURLs {
+            loadedImages.removeValue(forKey: url)
+            cacheExpirationDates.removeValue(forKey: url)
+            cacheAccessTimes.removeValue(forKey: url)
+            etags.removeValue(forKey: url)
+            lastModifieds.removeValue(forKey: url)
         }
+
+        logger.debug("Cleaned up \(expiredURLs.count) expired cache entries")
     }
-    
-    /// Parse HTTP cache headers to determine expiration date
-    private func parseCacheExpiration(from response: HTTPURLResponse, requestDate: Date) -> Date? {
-        // Check Cache-Control header first (takes precedence over Expires)
+
+    private nonisolated func parseCacheExpiration(from response: HTTPURLResponse, requestDate: Date) -> Date? {
         if let cacheControl = response.value(forHTTPHeaderField: "Cache-Control") {
             let directives = cacheControl.lowercased().split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-            
+
             for directive in directives {
-                // Check for no-cache or no-store (don't cache)
                 if directive == "no-cache" || directive == "no-store" {
-                    return Date.distantPast // Expired immediately
+                    return Date.distantPast
                 }
-                
-                // Check for max-age directive
                 if directive.hasPrefix("max-age=") {
                     let maxAgeString = String(directive.dropFirst(8))
                     if let maxAge = TimeInterval(maxAgeString) {
                         return requestDate.addingTimeInterval(maxAge)
                     }
                 }
-                
-                // Check for s-maxage (shared cache max-age)
                 if directive.hasPrefix("s-maxage=") {
                     let sMaxAgeString = String(directive.dropFirst(9))
                     if let sMaxAge = TimeInterval(sMaxAgeString) {
@@ -159,34 +153,28 @@ class ImagePreloader: ObservableObject {
                 }
             }
         }
-        
-        // Fall back to Expires header
+
         if let expiresString = response.value(forHTTPHeaderField: "Expires") {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
             formatter.timeZone = TimeZone(secondsFromGMT: 0)
-            
+
             if let expiresDate = formatter.date(from: expiresString) {
                 return expiresDate
             }
         }
-        
-        // If no cache headers provided, treat as "hot" cache (no expiration)
-        // This means the image will be cached indefinitely until explicitly invalidated
+
         return Date.distantFuture
     }
-    
-    /// Remove image from cache (used for errors)
+
     private func removeFromCache(_ url: URL) {
-        DispatchQueue.main.async {
-            self.loadedImages.removeValue(forKey: url)
-            self.cacheExpirationDates.removeValue(forKey: url)
-            self.cacheAccessTimes.removeValue(forKey: url)
-            self.etags.removeValue(forKey: url)
-            self.lastModifieds.removeValue(forKey: url)
-            self.hasLoadedOnce.remove(url)
-        }
+        loadedImages.removeValue(forKey: url)
+        cacheExpirationDates.removeValue(forKey: url)
+        cacheAccessTimes.removeValue(forKey: url)
+        etags.removeValue(forKey: url)
+        lastModifieds.removeValue(forKey: url)
+        hasLoadedOnce.remove(url)
     }
 
     func preloadImages(from urlStrings: [String]) {
@@ -195,155 +183,123 @@ class ImagePreloader: ObservableObject {
         for url in urls {
             loadImage(for: url)
         }
-        DispatchQueue.main.async {
-            self.lastRefreshed = Date()
-        }
+        lastRefreshed = Date()
     }
-    
+
     /// Preload media items (only loads images, skips videos)
     func preloadMedia(from mediaItems: [MediaItem]) {
         let urls = mediaItems
-            .filter { !$0.type.isVideo } // Only preload images
+            .filter { !$0.type.isVideo }
             .compactMap { URL(string: $0.url) }
         self.urls = urls
         for url in urls {
             loadImage(for: url)
         }
-        DispatchQueue.main.async {
-            self.lastRefreshed = Date()
-        }
+        lastRefreshed = Date()
     }
 
     func refreshImages() {
         for url in urls {
             loadImage(for: url, forceRefresh: true)
         }
-        DispatchQueue.main.async {
-            self.lastRefreshed = Date()
-        }
+        lastRefreshed = Date()
     }
-    
+
     func retryImage(for url: URL) {
         loadImage(for: url, forceRefresh: true)
     }
-    
+
     /// Load image immediately with high priority (for visible images)
     func loadImageImmediately(for url: URL) {
-        // Remove from queue if present to prioritize
         refreshQueue.removeAll { $0 == url }
         loadImage(for: url, forceRefresh: false)
     }
 
     private func startBackgroundRefresh() {
-        // Main refresh cycle - repopulate queue
-        timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
-            self?.queueBackgroundRefresh()
+        // Main refresh cycle — repopulate queue
+        refreshCycleTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(self?.refreshInterval ?? 30))
+                guard !Task.isCancelled else { break }
+                self?.queueBackgroundRefresh()
+            }
         }
-        
-        // Batch processor - continuously process queue
-        Timer.scheduledTimer(withTimeInterval: batchRefreshInterval, repeats: true) { [weak self] _ in
-            self?.processRefreshQueue()
+
+        // Batch processor — continuously process queue
+        batchProcessorTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(self?.batchRefreshInterval ?? 0.5))
+                guard !Task.isCancelled else { break }
+                self?.processRefreshQueue()
+            }
         }
-        
+
         // Cleanup expired cache entries periodically
-        Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
-            self?.cleanupExpiredCache()
+        cacheCleanupTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard !Task.isCancelled else { break }
+                self?.cleanupExpiredCache()
+            }
         }
     }
-    
-    /// Queue all images for refresh (called every refreshInterval seconds)
+
     private func queueBackgroundRefresh() {
-        // Add all URLs to queue if not already queued or loading
-        // Don't skip expired entries — live camera feeds should always be re-checked
         let urlsToQueue = urls.filter { url in
             !refreshQueue.contains(url) && !loading.contains(url)
         }
-        
-        // Prioritize recently accessed images
+
         let sortedUrls = urlsToQueue.sorted { url1, url2 in
             let time1 = cacheAccessTimes[url1] ?? .distantPast
             let time2 = cacheAccessTimes[url2] ?? .distantPast
             return time1 > time2
         }
-        
+
         refreshQueue.append(contentsOf: sortedUrls)
-        
+
         if !sortedUrls.isEmpty {
             logger.debug("Queued \(sortedUrls.count) images for refresh")
         }
     }
-    
-    /// Process refresh queue in small batches (called every 500ms)
+
     private func processRefreshQueue() {
-        // Only process if we have capacity
-        guard loading.count < maxConcurrentLoads else {
-            return
-        }
-        
-        // Process next batch
+        guard loading.count < maxConcurrentLoads else { return }
+
         let availableSlots = maxConcurrentLoads - loading.count
         let batch = Array(refreshQueue.prefix(availableSlots))
-        
+
         if !batch.isEmpty {
             refreshQueue.removeFirst(batch.count)
-            
+
             for url in batch {
                 loadImage(for: url)
             }
-            
-            DispatchQueue.main.async {
-                self.lastRefreshed = Date()
-            }
+
+            lastRefreshed = Date()
         }
     }
 
     private func loadImage(for url: URL, forceRefresh: Bool = false) {
-        let startTime = Date()
-        
-        // Check if already loading - prevent duplicate requests (thread-safe check)
-        var isAlreadyLoading = false
-        if Thread.isMainThread {
-            isAlreadyLoading = loading.contains(url)
-        } else {
-            // If called from background thread, check synchronously on main thread
-            // This is safe because we're not on main thread, so no deadlock risk
-            DispatchQueue.main.sync {
-                isAlreadyLoading = self.loading.contains(url)
-            }
-        }
-        
-        if isAlreadyLoading && !forceRefresh {
-            // Already loading, just record access
-            DispatchQueue.main.async {
-                self.recordAccess(for: url)
-            }
+        if loading.contains(url) && !forceRefresh {
+            recordAccess(for: url)
             return
         }
-        
-        // Check if we have a valid cached image (unless forcing refresh)
-        // Note: Reading from dictionaries is generally safe across threads when modifications
-        // only happen on main thread, which is the case here
+
         if !forceRefresh, loadedImages[url] != nil, isCacheValid(for: url) {
-            // Cache is valid, no need to reload
-            DispatchQueue.main.async {
-                self.recordAccess(for: url)
-            }
+            recordAccess(for: url)
             return
         }
-        
-        // If cache expired, remove it (on main thread)
+
+        // If cache expired, remove stale entry
         if !forceRefresh, loadedImages[url] != nil, !isCacheValid(for: url) {
-            DispatchQueue.main.async {
-                self.loadedImages.removeValue(forKey: url)
-                self.cacheExpirationDates.removeValue(forKey: url)
-            }
+            loadedImages.removeValue(forKey: url)
+            cacheExpirationDates.removeValue(forKey: url)
         }
-        
+
         var request = URLRequest(url: url)
         request.cachePolicy = forceRefresh ? .reloadIgnoringLocalCacheData : .useProtocolCachePolicy
         request.timeoutInterval = AppEnvironment.networkTimeout
-        
-        // Add conditional request headers for efficient 304 responses
+
         if !forceRefresh {
             if let etag = etags[url] {
                 request.setValue(etag, forHTTPHeaderField: "If-None-Match")
@@ -352,207 +308,172 @@ class ImagePreloader: ObservableObject {
                 request.setValue(lastModified, forHTTPHeaderField: "If-Modified-Since")
             }
         }
-        
-        // Always mark as loading so UI can show loading state
-        DispatchQueue.main.async {
-            self.loading.insert(url)
+
+        loading.insert(url)
+
+        let startTime = Date()
+        let capturedEtag = etags[url]
+        let capturedLastModified = lastModifieds[url]
+
+        Task {
+            await fetchAndProcessImage(
+                url: url,
+                request: request,
+                startTime: startTime,
+                prevEtag: capturedEtag,
+                prevLastModified: capturedLastModified
+            )
         }
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            guard let self = self else { return }
-            
+    }
+
+    /// Fetch image data using async/await and process the result
+    private func fetchAndProcessImage(
+        url: URL,
+        request: URLRequest,
+        startTime: Date,
+        prevEtag: String?,
+        prevLastModified: String?
+    ) async {
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
             let duration = Date().timeIntervalSince(startTime)
-            
-            // Check for HTTP error status codes first
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode >= 400 {
-                let statusCode = httpResponse.statusCode
-                self.logger.error("HTTP error \(statusCode) for URL: \(url.absoluteString)")
-                
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                logger.warning("No HTTP response for URL: \(url.absoluteString)")
+                removeFromCache(url)
+                loading.remove(url)
+                return
+            }
+
+            // HTTP error
+            if httpResponse.statusCode >= 400 {
+                logger.error("HTTP error \(httpResponse.statusCode) for URL: \(url.absoluteString)")
                 MetricsService.shared.track(
                     event: .imageLoadFailure,
                     duration: duration,
-                    tags: ["url": url.absoluteString, "error": "HTTP \(statusCode)"]
+                    tags: ["url": url.absoluteString, "error": "HTTP \(httpResponse.statusCode)"]
                 )
-                
-                // Remove from cache on error
-                self.removeFromCache(url)
-                
-                DispatchQueue.main.async {
-                    self.loading.remove(url)
-                }
+                removeFromCache(url)
+                loading.remove(url)
                 return
             }
-            
-            if let error = error {
-                self.logger.error("Failed to download image for URL: \(url.absoluteString)", error: error)
-                
-                // Track failure
-                MetricsService.shared.track(
-                    event: .imageLoadFailure,
-                    duration: duration,
-                    tags: ["url": url.absoluteString, "error": error.localizedDescription]
-                )
-                
-                // Remove from cache on error
-                self.removeFromCache(url)
-                
-                DispatchQueue.main.async {
-                    self.loading.remove(url)
-                }
-                return
-            }
-            
-            // Handle 304 Not Modified - image unchanged, no work needed!
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 304 {
-                self.logger.debug("Image unchanged (304) for URL: \(url.absoluteString)")
-                
+
+            // 304 Not Modified
+            if httpResponse.statusCode == 304 {
+                logger.debug("Image unchanged (304) for URL: \(url.absoluteString)")
                 MetricsService.shared.track(
                     event: .imageLoadSuccess,
                     duration: duration,
                     tags: ["changed": "false", "cached": "true"]
                 )
-                
-                DispatchQueue.main.async {
-                    self.loading.remove(url)
-                    self.recordAccess(for: url)
-                    self.lastRefreshed = Date()
-                }
+                loading.remove(url)
+                recordAccess(for: url)
+                lastRefreshed = Date()
                 return
             }
-            
-            guard let data = data, data.count > 100 else {
-                let dataSize = data?.count ?? 0
-                self.logger.warning("Image data for URL \(url.absoluteString) is too small or missing (size: \(dataSize))")
-                
+
+            // Validate data
+            guard data.count > 100 else {
+                logger.warning("Image data for URL \(url.absoluteString) is too small or missing (size: \(data.count))")
                 MetricsService.shared.track(
                     event: .imageLoadFailure,
                     duration: duration,
-                    tags: ["url": url.absoluteString, "error": "Invalid data size: \(dataSize)"]
+                    tags: ["url": url.absoluteString, "error": "Invalid data size: \(data.count)"]
                 )
-                
-                // Remove from cache on error
-                self.removeFromCache(url)
-                
-                DispatchQueue.main.async {
-                    self.loading.remove(url)
-                }
+                removeFromCache(url)
+                loading.remove(url)
                 return
             }
-            
-            // Decode image off main thread
-            guard let image = UIImage(data: data) else {
-                self.logger.error("Failed to decode image for URL: \(url.absoluteString). Data length: \(data.count)")
-                
+
+            // Decode image off main actor
+            let image = await decodeImage(from: data)
+            guard let decodedImage = image else {
+                logger.error("Failed to decode image for URL: \(url.absoluteString). Data length: \(data.count)")
                 MetricsService.shared.track(
                     event: .imageLoadFailure,
                     duration: duration,
                     tags: ["url": url.absoluteString, "error": "Decode failure", "data_size": "\(data.count)"]
                 )
-                
-                // Remove from cache on error
-                self.removeFromCache(url)
-                
-                DispatchQueue.main.async {
-                    self.loading.remove(url)
-                }
+                removeFromCache(url)
+                loading.remove(url)
                 return
             }
-            
-            // Force decompression off main thread to avoid stuttering
-            let decompressedImage = image.preparingForDisplay()
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                self.logger.warning("No HTTP response for URL: \(url.absoluteString)")
-                
-                // Remove from cache on error
-                self.removeFromCache(url)
-                
-                DispatchQueue.main.async {
-                    self.loading.remove(url)
-                }
-                return
-            }
-            
+
             let newEtag = httpResponse.allHeaderFields["Etag"] as? String
             let newLastModified = httpResponse.allHeaderFields["Last-Modified"] as? String
-            
-            // Parse cache expiration from HTTP headers
-            let expirationDate = self.parseCacheExpiration(from: httpResponse, requestDate: startTime)
-            
-            DispatchQueue.main.async {
-                let prevEtag = self.etags[url]
-                let prevLastModified = self.lastModifieds[url]
-                let changed: Bool = {
-                    var changed = false
-                    if let newEtag = newEtag {
-                        if let prevEtag = prevEtag {
-                            changed = newEtag != prevEtag
-                        } else {
-                            changed = true
-                        }
-                    }
-                    if let newLastModified = newLastModified {
-                        if let prevLastModified = prevLastModified {
-                            changed = changed || (newLastModified != prevLastModified)
-                        } else {
-                            changed = true
-                        }
-                    }
-                    return changed
-                }()
-                
-                let isFirstLoad = !self.hasLoadedOnce.contains(url)
-                
-                // For no-cache/no-store: display the image but treat as hot cache
-                // so the background timer re-fetches it on the next cycle.
-                // (Previously this discarded the image entirely, causing shimmer forever.)
-                if expirationDate == Date.distantPast {
-                    self.loadedImages[url] = decompressedImage ?? image
-                    self.cacheExpirationDates.removeValue(forKey: url) // hot cache → always re-queued
-                    self.recordAccess(for: url)
-                    self.lastRefreshed = Date()
-                    self.hasLoadedOnce.insert(url)
-                    self.loading.remove(url)
-                    if let newEtag = newEtag { self.etags[url] = newEtag }
-                    if let newLastModified = newLastModified { self.lastModifieds[url] = newLastModified }
-                    return
+            let expirationDate = parseCacheExpiration(from: httpResponse, requestDate: startTime)
+
+            // Determine if content changed
+            let changed: Bool = {
+                var changed = false
+                if let newEtag = newEtag {
+                    changed = newEtag != prevEtag
                 }
-                
-                // Use decompressed image to avoid UI lag
-                self.loadedImages[url] = decompressedImage ?? image
-                
-                // Store cache expiration date (parseCacheExpiration always returns a value)
-                self.cacheExpirationDates[url] = expirationDate
-                
-                self.recordAccess(for: url)
-                self.lastRefreshed = Date()
-                self.hasLoadedOnce.insert(url)
-                
-                // Track successful load
-                MetricsService.shared.track(
-                    event: .imageLoadSuccess,
-                    duration: duration,
-                    tags: ["changed": changed ? "true" : "false"]
-                )
-                
-                // Always clear loading state — previously it was never cleared on first load,
-                // which caused the background refresh timer to skip the URL forever.
-                self.loading.remove(url)
-                if changed && !isFirstLoad {
-                    self.fadingOut[url] = Date()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        self.fadingOut.removeValue(forKey: url)
-                    }
+                if let newLastModified = newLastModified {
+                    changed = changed || (newLastModified != prevLastModified)
                 }
-                
-                if let newEtag = newEtag { self.etags[url] = newEtag }
-                if let newLastModified = newLastModified { self.lastModifieds[url] = newLastModified }
+                return changed
+            }()
+
+            let isFirstLoad = !hasLoadedOnce.contains(url)
+
+            // Handle no-cache/no-store: display image but treat as hot cache
+            if expirationDate == Date.distantPast {
+                loadedImages[url] = decodedImage
+                cacheExpirationDates.removeValue(forKey: url)
+                recordAccess(for: url)
+                lastRefreshed = Date()
+                hasLoadedOnce.insert(url)
+                loading.remove(url)
+                if let newEtag = newEtag { etags[url] = newEtag }
+                if let newLastModified = newLastModified { lastModifieds[url] = newLastModified }
+                return
             }
-            
-            // Prune cache if needed (do outside main queue to avoid blocking)
-            if self.loadedImages.count > self.maxCachedImages {
-                self.pruneCache()
+
+            loadedImages[url] = decodedImage
+            cacheExpirationDates[url] = expirationDate
+            recordAccess(for: url)
+            lastRefreshed = Date()
+            hasLoadedOnce.insert(url)
+
+            MetricsService.shared.track(
+                event: .imageLoadSuccess,
+                duration: duration,
+                tags: ["changed": changed ? "true" : "false"]
+            )
+
+            loading.remove(url)
+            if changed && !isFirstLoad {
+                fadingOut[url] = Date()
+                Task {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    fadingOut.removeValue(forKey: url)
+                }
             }
-        }.resume()
+
+            if let newEtag = newEtag { etags[url] = newEtag }
+            if let newLastModified = newLastModified { lastModifieds[url] = newLastModified }
+
+            if loadedImages.count > maxCachedImages {
+                pruneCache()
+            }
+
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.error("Failed to download image for URL: \(url.absoluteString)", error: error)
+            MetricsService.shared.track(
+                event: .imageLoadFailure,
+                duration: duration,
+                tags: ["url": url.absoluteString, "error": error.localizedDescription]
+            )
+            removeFromCache(url)
+            loading.remove(url)
+        }
+    }
+
+    /// Decode image data off the main actor to avoid UI stutter
+    private nonisolated func decodeImage(from data: Data) async -> UIImage? {
+        guard let image = UIImage(data: data) else { return nil }
+        return image.preparingForDisplay() ?? image
     }
 }

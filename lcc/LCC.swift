@@ -9,17 +9,17 @@ import SwiftUI
 
 @main
 struct LCC: App {
-    @StateObject private var apiService = APIService()
-    @StateObject private var preloader = ImagePreloader()
-    @StateObject private var networkMonitor = NetworkMonitor.shared
-    
+    @State private var apiService = APIService()
+    @State private var preloader = ImagePreloader()
+    @State private var networkMonitor = NetworkMonitor.shared
+
     init() {
         // Initialize metrics service
         _ = MetricsService.shared
-        
+
         // Print configuration in debug mode
         AppEnvironment.printConfiguration()
-        
+
         // Track app launch
         MetricsService.shared.track(
             event: .appLaunch,
@@ -28,25 +28,25 @@ struct LCC: App {
                 "build": AppEnvironment.buildNumber
             ]
         )
-        
+
         Logger.app.info("🚀 App launched - Version \(AppEnvironment.fullVersion)")
     }
-    
+
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(apiService)
-                .environmentObject(preloader)
-                .environmentObject(networkMonitor)
+                .environment(apiService)
+                .environment(preloader)
+                .environment(networkMonitor)
                 .background(Color.black.ignoresSafeArea(.all))
         }
     }
 }
 
 struct ContentView: View {
-    @EnvironmentObject var apiService: APIService
-    @EnvironmentObject var preloader: ImagePreloader
-    
+    @Environment(APIService.self) var apiService
+    @Environment(ImagePreloader.self) var preloader
+
     var body: some View {
         MainView(
             mediaItems: (

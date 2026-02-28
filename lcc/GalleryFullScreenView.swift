@@ -11,7 +11,7 @@ struct GalleryFullScreenView: View {
     @State private var dismissOpacity: Double = 1.0
     @State private var backgroundOpacity: Double = 1.0
     @State private var maxDragDistance: CGFloat = 0
-    @EnvironmentObject var preloader: ImagePreloader
+    @Environment(ImagePreloader.self) var preloader
     
     // MARK: - Constants
     private enum DragConstants {

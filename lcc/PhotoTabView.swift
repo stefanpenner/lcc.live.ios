@@ -1,21 +1,17 @@
-import Combine
 import Foundation
 import SwiftUI
 
 struct PhotoTabView: View {
     let mediaItems: [MediaItem]
-    
+
     @Binding public var gridMode: GridMode
     var onRequestFullScreen: (PresentedMedia) -> Void
-    @EnvironmentObject var preloader: ImagePreloader
-    @EnvironmentObject var apiService: APIService
+    @Environment(ImagePreloader.self) var preloader
+    @Environment(APIService.self) var apiService
 
     @Environment(\.colorScheme) var colorScheme
-    @State private var isRefreshing = false
-    @State private var hasCompletedInitialLoad = false
-    @State private var isCompletingLoad = false // Prevent multiple completion triggers
-    @State private var hasReceivedInitialPayload = false // Track if API has responded
-    
+    @State private var isInitialLoadComplete = false
+
     private let logger = Logger(category: .ui)
 
     // User grid mode
@@ -35,17 +31,16 @@ struct PhotoTabView: View {
             let imageWidth = (availableWidth - CGFloat(columns - 1) * spacing) / CGFloat(columns)
             let imageHeight = imageWidth * (gridMode == .single ? 0.9 : 0.9)
             let gridItems = Array(repeating: GridItem(.fixed(imageWidth), spacing: spacing), count: columns)
-            
+
             ZStack {
                 Color.black.ignoresSafeArea(.all)
-                
+
                 // Main content
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
                             if mediaItems.isEmpty {
-                                // Only show empty state after we've received API response
-                                if hasReceivedInitialPayload {
+                                if isInitialLoadComplete {
                                     EmptyStateView()
                                         .frame(width: availableWidth, height: availableHeight * 0.6)
                                 }
@@ -57,7 +52,7 @@ struct PhotoTabView: View {
                                             imageWidth: imageWidth,
                                             imageHeight: imageHeight,
                                             colorScheme: colorScheme,
-                                            hasCompletedInitialLoad: hasCompletedInitialLoad,
+                                            hasCompletedInitialLoad: isInitialLoadComplete,
                                             onTap: {
                                                 onRequestFullScreen(PresentedMedia(mediaItem: mediaItem))
                                             },
@@ -68,7 +63,7 @@ struct PhotoTabView: View {
                                             }
                                         )
                                     }
-                                    
+
                                     // Bottom spacer for grid mode toggle
                                     Color.clear
                                         .frame(height: 70)
@@ -87,10 +82,9 @@ struct PhotoTabView: View {
                 .background(ScrollViewConfigurator())
                 .ignoresSafeArea(edges: .all)
                 .modifier(ZeroScrollContentMarginsIfAvailable())
-                
-                // Unified loading overlay during initial load
-                // Show loading screen only until API responds, not until images load
-                if !hasReceivedInitialPayload {
+
+                // Loading overlay — visible until API responds
+                if !isInitialLoadComplete {
                     VStack(spacing: 0) {
                         InitialLoadingView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -101,7 +95,7 @@ struct PhotoTabView: View {
                     .transition(.opacity)
                 }
 
-                // Fades pinned to device edges using overlay alignment so they reach the very top/bottom
+                // Fades pinned to device edges
                 Color.clear
                     .overlay(alignment: .top) {
                         LinearGradient(
@@ -128,7 +122,7 @@ struct PhotoTabView: View {
                         )
                         .frame(height: 220)
                         .ignoresSafeArea(edges: .bottom)
-                        .offset(y: 60) // start further offscreen for seamless fade
+                        .offset(y: 60)
                     }
                     .allowsHitTesting(false)
             }
@@ -136,129 +130,37 @@ struct PhotoTabView: View {
         }
         .onAppear {
             logger.info("📱 PhotoTabView appeared with \(mediaItems.count) media items")
-            logger.debug("Initial state - hasReceivedPayload: \(hasReceivedInitialPayload), hasCompletedLoad: \(hasCompletedInitialLoad)")
-
-            // Only preload, don't force refresh on appear (refresh happens via background timer)
             preloader.preloadMedia(from: mediaItems)
 
-            // Check current state immediately — handles the case where data is already loaded
-            // when this tab view first appears (e.g., switching to BCC after LCC already loaded)
-            if !hasReceivedInitialPayload {
-                if !mediaItems.isEmpty {
-                    logger.info("📦 Tab appeared with \(mediaItems.count) existing items - hiding loading screen immediately")
-                    hasReceivedInitialPayload = true
-                    hasCompletedInitialLoad = true
-                } else if !apiService.isLoading {
-                    logger.info("📦 API already done loading (empty result) - hiding loading screen")
-                    hasReceivedInitialPayload = true
-                    hasCompletedInitialLoad = true
+            // If data already available when tab appears (e.g. switching tabs), complete immediately
+            if !isInitialLoadComplete {
+                if !mediaItems.isEmpty || !apiService.isLoading {
+                    isInitialLoadComplete = true
                 }
             }
-
-            // Check completion status periodically
-            Task { @MainActor in
-                for iteration in 0..<50 { // Check every 100ms for up to 5 seconds
-                    try? await Task.sleep(for: .milliseconds(100))
-                    checkInitialLoadCompletion()
-                    if hasCompletedInitialLoad {
-                        logger.info("✅ Initial load completed at iteration \(iteration)")
-                        break
-                    }
-                }
-
-                // Safety timeout: mark initial load as complete after 5 seconds regardless
-                if !hasCompletedInitialLoad {
-                    logger.warning("⏱️ Safety timeout triggered - forcing initial load completion")
-                    withAnimation(.easeOut(duration: 0.4)) {
-                        hasReceivedInitialPayload = true
-                        hasCompletedInitialLoad = true
-                    }
-                }
-            }
-        }
-        .onChange(of: preloader.loadedImages.count) { _, _ in
-            checkInitialLoadCompletion()
-        }
-        .onChange(of: preloader.loading.count) { _, _ in
-            checkInitialLoadCompletion()
         }
         .onChange(of: mediaItems.isEmpty) { _, isEmpty in
-            logger.debug("📊 Media items empty changed: \(isEmpty)")
-            
-            // Mark that we've received API payload once we have items
-            if !isEmpty && !hasReceivedInitialPayload {
-                logger.info("📦 Received API payload with \(mediaItems.count) items - hiding loading screen")
-                hasReceivedInitialPayload = true
-                // Hide loading screen immediately when API data arrives (like web)
-                hasCompletedInitialLoad = true
+            if !isEmpty && !isInitialLoadComplete {
+                isInitialLoadComplete = true
             }
         }
         .onChange(of: apiService.isLoading) { _, isLoading in
-            logger.debug("🔄 API loading state changed: \(isLoading)")
-            
-            // Mark payload received when API completes (whether we have items or not)
-            if !isLoading && !hasReceivedInitialPayload {
-                logger.info("📦 API loading completed - mediaItems: \(mediaItems.count) - hiding loading screen")
-                hasReceivedInitialPayload = true
-                // Hide loading screen immediately when API completes (like web)
-                hasCompletedInitialLoad = true
+            if !isLoading && !isInitialLoadComplete {
+                isInitialLoadComplete = true
             }
         }
-    }
-    
-    private func checkInitialLoadCompletion() {
-        guard !hasCompletedInitialLoad && !isCompletingLoad && !mediaItems.isEmpty else { return }
-        
-        // Get all image URLs from media items (excluding videos)
-        let imageUrls = mediaItems
-            .filter { !$0.type.isVideo }
-            .compactMap { URL(string: $0.url) }
-        
-        guard !imageUrls.isEmpty else {
-            // All items are videos, complete immediately
-            logger.info("🎬 All items are videos - completing initial load immediately")
-            hasCompletedInitialLoad = true
-            return
-        }
-        
-        // Count images in different states
-        let loadedCount = imageUrls.filter { preloader.loadedImages[$0] != nil }.count
-        let loadingCount = imageUrls.filter { preloader.loading.contains($0) }.count
-        
-        logger.debug("🔍 Load check - Total: \(imageUrls.count), Loaded: \(loadedCount), Loading: \(loadingCount)")
-        
-        // Only complete if:
-        // 1. No images are actively loading
-        // 2. We have loaded at least 50% of images OR all possible images have loaded
-        let minimumLoaded = imageUrls.count / 2
-        let allImagesFinal = loadingCount == 0
-        let enoughLoaded = loadedCount >= minimumLoaded && loadingCount == 0
-        
-        if allImagesFinal {
-            logger.info("🏁 All images final - Loaded: \(loadedCount)/\(imageUrls.count), triggering completion")
-            isCompletingLoad = true
-            
-            // Add a small delay for smooth transition
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(500))
+        .task {
+            // Safety timeout: if initial load hasn't completed after 5 seconds, force it
+            try? await Task.sleep(for: .seconds(5))
+            if !isInitialLoadComplete {
+                logger.warning("⏱️ Safety timeout triggered - forcing initial load completion")
                 withAnimation(.easeOut(duration: 0.4)) {
-                    hasCompletedInitialLoad = true
-                }
-            }
-        } else if enoughLoaded {
-            logger.info("✨ Enough images loaded - \(loadedCount)/\(imageUrls.count) (minimum: \(minimumLoaded)), triggering completion")
-            isCompletingLoad = true
-            
-            // Add a small delay for smooth transition
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(500))
-                withAnimation(.easeOut(duration: 0.4)) {
-                    hasCompletedInitialLoad = true
+                    isInitialLoadComplete = true
                 }
             }
         }
     }
-    
+
     private func performRefresh() async {
         #if os(iOS)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -279,29 +181,25 @@ struct ScrollViewConfigurator: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
         view.backgroundColor = .clear
-        
+
         // Delay to let SwiftUI create the ScrollView
         DispatchQueue.main.async {
             self.configureScrollView(in: view)
         }
-        
+
         return view
     }
-    
+
     func updateUIView(_ uiView: UIView, context: Context) {
         configureScrollView(in: uiView)
     }
-    
+
     private func configureScrollView(in view: UIView) {
-        // Find UIScrollView by traversing the view hierarchy
         var responder: UIResponder? = view
         while responder != nil {
             if let scrollView = responder as? UIScrollView {
-                // Configure to remove insets and make background transparent
                 scrollView.backgroundColor = .clear
                 scrollView.contentInsetAdjustmentBehavior = .never
-                
-                // Zero content insets to allow content to fill naturally
                 scrollView.contentInset = .zero
                 scrollView.scrollIndicatorInsets = .zero
                 scrollView.automaticallyAdjustsScrollIndicatorInsets = false
@@ -320,7 +218,7 @@ private struct ZeroScrollContentMarginsIfAvailable: ViewModifier {
 }
 
 #Preview {
-    let preloader = ImagePreloader()
+    @Previewable @State var preloader = ImagePreloader()
     let mediaItems = [
         "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzg2MTFlMjc2LTdlZTUtNDJjMC1iOGNkLWQ5ZTE4OTBlMWNkNC9zbmFwc2hvdA==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTQ2MDQuanBlZw==",
@@ -331,46 +229,26 @@ private struct ZeroScrollContentMarginsIfAvailable: ViewModifier {
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjguanBlZw==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTYyNjkuanBlZw=="
     ].compactMap { MediaItem.from(urlString: $0) }
-    
-    // Preload media immediately for preview
-    preloader.preloadMedia(from: mediaItems)
-    
-    return PhotoTabView(
+
+    PhotoTabView(
         mediaItems: mediaItems,
         gridMode: .constant(PhotoTabView.GridMode.single),
         onRequestFullScreen: { _ in })
-    .environmentObject(preloader)
+    .environment(preloader)
+    .environment(APIService())
 }
 
 #Preview("With Mock Images") {
-    // Mock preloader with sample images already loaded
-    class MockImagePreloader: ImagePreloader {
-        override init() {
-            super.init()
-            // Add some mock images to simulate loaded state
-            if let sampleImage = UIImage(systemName: "photo.fill") {
-                let urls = [
-                    "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzg2MTFlMjc2LTdlZTUtNDJjMC1iOGNkLWQ5ZTE4OTBlMWNkNC9zbmFwc2hvdA==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTQ2MDQuanBlZw==",
-                    "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTY2NDcuanBlZw=="
-                ].compactMap { URL(string: $0) }
-                
-                for url in urls {
-                    self.loadedImages[url] = sampleImage
-                }
-            }
-        }
-    }
-    
     let mediaItems = [
         "https://lcc.live/image/aHR0cHM6Ly9iMTAuaGRyZWxheS5jb20vY2FtZXJhLzg2MTFlMjc2LTdlZTUtNDJjMC1iOGNkLWQ5ZTE4OTBlMWNkNC9zbmFwc2hvdA==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTQ2MDQuanBlZw==",
         "https://lcc.live/image/aHR0cHM6Ly91ZG90dHJhZmZpYy51dGFoLmdvdi8xX2RldmljZXMvYXV4MTY2NDcuanBlZw=="
     ].compactMap { MediaItem.from(urlString: $0) }
-    
-    return PhotoTabView(
+
+    PhotoTabView(
         mediaItems: mediaItems,
         gridMode: .constant(PhotoTabView.GridMode.compact),
         onRequestFullScreen: { _ in })
-    .environmentObject(MockImagePreloader())
+    .environment(ImagePreloader())
+    .environment(APIService())
 }

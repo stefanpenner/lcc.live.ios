@@ -35,7 +35,7 @@ enum YouTubeURLHelper {
             if let regex = try? NSRegularExpression(pattern: "youtube\\.com/embed/([a-zA-Z0-9_-]+)", options: []),
                let match = regex.firstMatch(in: urlString, options: [], range: NSRange(urlString.startIndex..., in: urlString)),
                match.numberOfRanges > 1 {
-                let videoIDRange = Range(match.range(at: 1), in: urlString)!
+                guard let videoIDRange = Range(match.range(at: 1), in: urlString) else { return nil }
                 let videoID = String(urlString[videoIDRange])
                 if !videoID.isEmpty {
                     return videoID

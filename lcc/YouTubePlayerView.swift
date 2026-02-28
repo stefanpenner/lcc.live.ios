@@ -79,7 +79,7 @@ struct YouTubePlayerView: UIViewRepresentable {
         // Error 153 occurs when YouTube doesn't receive a proper referrer header
         // Using the app's bundle identifier as a custom scheme ensures referrer is sent
         // Alternatively, use a valid HTTPS URL that matches your app's domain
-        let baseURL = URL(string: "https://lcc.live") ?? URL(string: "https://www.youtube.com")!
+        let baseURL = URL(string: "https://lcc.live")
         
         Logger.ui.debug("🎥 Loading YouTube video (exact website format): \(embedURL)")
         webView.loadHTMLString(htmlString, baseURL: baseURL)

@@ -2,9 +2,9 @@ import SwiftUI
 
 /// Detailed connection information popover
 struct ConnectionDetailsView: View {
-    @EnvironmentObject var networkMonitor: NetworkMonitor
-    @EnvironmentObject var apiService: APIService
-    @EnvironmentObject var preloader: ImagePreloader
+    @Environment(NetworkMonitor.self) var networkMonitor
+    @Environment(APIService.self) var apiService
+    @Environment(ImagePreloader.self) var preloader
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -153,13 +153,9 @@ struct StatusRow: View {
 }
 
 #Preview {
-    let apiService = APIService()
-    let preloader = ImagePreloader()
-    let networkMonitor = NetworkMonitor()
-    
-    return ConnectionDetailsView()
-        .environmentObject(apiService)
-        .environmentObject(preloader)
-        .environmentObject(networkMonitor)
+    ConnectionDetailsView()
+        .environment(APIService())
+        .environment(ImagePreloader())
+        .environment(NetworkMonitor())
 }
 

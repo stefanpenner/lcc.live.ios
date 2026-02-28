@@ -9,7 +9,7 @@ struct MediaCell: View {
     let onTap: () -> Void
     let onRetry: () -> Void
 
-    @EnvironmentObject var preloader: ImagePreloader
+    @Environment(ImagePreloader.self) var preloader
     @State private var isRetrying = false
 
     var body: some View {
@@ -30,9 +30,8 @@ struct MediaCell: View {
                         .accessibilityLabel("YouTube video")
                         .accessibilityAddTraits(.isButton)
                     }
-                } else {
-                    // Show image (existing code)
-                    let url = URL(string: mediaItem.url)!
+                } else if let url = URL(string: mediaItem.url) {
+                    // Show image
                     let loadedImage = preloader.loadedImages[url]
                     
                     if let uiImage = loadedImage {

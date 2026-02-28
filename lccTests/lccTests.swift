@@ -176,7 +176,7 @@ struct GalleryHelperTests {
 struct InvalidInputTests {
     
     @Test("ImagePreloader handles invalid URLs gracefully")
-    func testInvalidURLs() async throws {
+    @MainActor func testInvalidURLs() async throws {
         let preloader = ImagePreloader()
         let invalidUrls = ["not a url", "ht!tp://bad", ""]
         preloader.preloadImages(from: invalidUrls)
@@ -493,7 +493,7 @@ struct UIIntegrationTests {
     }
     
     @Test("UI switches between LCC and BCC tabs and loads streams from test server")
-    func testUITabSwitchingWithTestServer() async throws {
+    @MainActor func testUITabSwitchingWithTestServer() async throws {
         // Set up local HTTP server with fixtures (keep reference to prevent deallocation)
         let (server, serverBaseURL) = try await setupTestServer()
         defer { server.stop() }
@@ -603,7 +603,7 @@ struct UIIntegrationTests {
     }
     
     @Test("MainView renders with test server data and PhotoTabView receives correct items")
-    func testMainViewRenderingWithTestServer() async throws {
+    @MainActor func testMainViewRenderingWithTestServer() async throws {
         // Set up local HTTP server
         let (server, serverBaseURL) = try await setupTestServer()
         defer { server.stop() }
@@ -685,7 +685,7 @@ struct UIIntegrationTests {
     }
     
     @Test("SwiftUI MainView actually renders and switches tabs with test server")
-    func testSwiftUIMainViewTabSwitching() async throws {
+    @MainActor func testSwiftUIMainViewTabSwitching() async throws {
         // Set up local HTTP server
         let (server, serverBaseURL) = try await setupTestServer()
         defer { server.stop() }
@@ -802,7 +802,7 @@ struct UIIntegrationTests {
     }
     
     @Test("Renders actual SwiftUI MainView and switches tabs visually")
-    func testRenderedMainViewTabSwitching() async throws {
+    @MainActor func testRenderedMainViewTabSwitching() async throws {
         // Set up local HTTP server
         let (server, serverBaseURL) = try await setupTestServer()
         defer { server.stop() }

@@ -16,13 +16,11 @@ struct MainView: View {
     }
     
     let mediaItems: (lcc: [MediaItem], bcc: [MediaItem])
-    @EnvironmentObject var preloader: ImagePreloader
-    @EnvironmentObject var networkMonitor: NetworkMonitor
-    @EnvironmentObject var apiService: APIService
+    @Environment(ImagePreloader.self) var preloader
+    @Environment(NetworkMonitor.self) var networkMonitor
+    @Environment(APIService.self) var apiService
 
     @State private var selectedTab: Tab = .lcc
-    @State private var refreshImagesTrigger = 0
-    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var gridMode: PhotoTabView.GridMode = .single
     @State private var fullScreenMedia: PresentedMedia? = nil
@@ -40,6 +38,45 @@ struct MainView: View {
         )
     }
     
+    @ViewBuilder
+    private func tabContent(items: [MediaItem], tab: Tab) -> some View {
+        NavigationStack {
+            PhotoTabView(
+                mediaItems: items,
+                gridMode: $gridMode,
+                onRequestFullScreen: { media in
+                    fullScreenMedia = media
+                }
+            )
+            .toolbar {
+                ToolbarItemGroup(placement: .bottomBar) {
+                    Button {
+                        showConnectionDetails = true
+                    } label: {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 10, height: 10)
+                            .shadow(color: statusColor.opacity(0.6), radius: 4)
+                            .padding(8)
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    Button {
+                        withAnimation {
+                            gridMode = gridMode == .single ? .compact : .single
+                        }
+                    } label: {
+                        Image(systemName: gridMode == .single ? "square.grid.2x2" : "rectangle.fill")
+                    }
+                }
+            }
+        }
+        .tag(tab)
+        .tabItem { tab.label }
+    }
+
     private var popoverAnchorPoint: UnitPoint {
         // In landscape (regular width), position further from edge to account for wider screen
         // In portrait (compact width), keep closer to left edge
@@ -49,87 +86,8 @@ struct MainView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            // LCC Tab
-            NavigationStack {
-                PhotoTabView(
-                    mediaItems: mediaItems.lcc,
-                    gridMode: $gridMode,
-                    onRequestFullScreen: { media in
-                        fullScreenMedia = media
-                    }
-                )
-                .toolbar {
-                    ToolbarItemGroup(placement: .bottomBar) {
-                        // Status button
-                        Button {
-                            showConnectionDetails = true
-                        } label: {
-                            Circle()
-                                .fill(statusColor)
-                                .frame(width: 10, height: 10)
-                                .shadow(color: statusColor.opacity(0.6), radius: 4)
-                                .padding(8)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Spacer()
-                        
-                        // Grid mode toggle
-                        Button {
-                            withAnimation {
-                                gridMode = gridMode == .single ? .compact : .single
-                            }
-                        } label: {
-                            Image(systemName: gridMode == .single ? "square.grid.2x2" : "rectangle.fill")
-                        }
-                    }
-                }
-            }
-            .tag(Tab.lcc)
-            .tabItem {
-                Label("LCC", systemImage: "mountain.2")
-            }
-            
-            // BCC Tab
-            NavigationStack {
-                PhotoTabView(
-                    mediaItems: mediaItems.bcc,
-                    gridMode: $gridMode,
-                    onRequestFullScreen: { media in
-                        fullScreenMedia = media
-                    }
-                )
-                .toolbar {
-                    ToolbarItemGroup(placement: .bottomBar) {
-                        // Status button
-                        Button {
-                            showConnectionDetails = true
-                        } label: {
-                            Circle()
-                                .fill(statusColor)
-                                .frame(width: 10, height: 10)
-                                .shadow(color: statusColor.opacity(0.6), radius: 4)
-                                .padding(8)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Spacer()
-                        
-                        // Grid mode toggle
-                        Button {
-                            withAnimation {
-                                gridMode = gridMode == .single ? .compact : .single
-                            }
-                        } label: {
-                            Image(systemName: gridMode == .single ? "square.grid.2x2" : "rectangle.fill")
-                        }
-                    }
-                }
-            }
-            .tag(Tab.bcc)
-            .tabItem {
-                Label("BCC", systemImage: "mountain.2")
-            }
+            tabContent(items: mediaItems.lcc, tab: .lcc)
+            tabContent(items: mediaItems.bcc, tab: .bcc)
         }
         .background(Color.black.ignoresSafeArea(.all))
         .popover(isPresented: $showConnectionDetails, attachmentAnchor: .point(popoverAnchorPoint), arrowEdge: .bottom) {
@@ -156,7 +114,7 @@ struct MainView: View {
                 initialIndex: currentMediaItems.firstIndex(where: { $0.url == presented.mediaItem.url }) ?? 0,
                 onClose: { fullScreenMedia = nil }
             )
-            .environmentObject(preloader)
+            .environment(preloader)
         }
         .onChange(of: fullScreenMedia) { _, newValue in
             // Close popover when navigating to full screen
@@ -167,9 +125,7 @@ struct MainView: View {
         .onChange(of: selectedTab) { _, _ in
             // Close popover when switching tabs to prevent crashes
             showConnectionDetails = false
-            refreshImagesTrigger += 1
         }
-        .onChange(of: scenePhase) { _, newPhase in if newPhase == .active { refreshImagesTrigger += 1 } }
     }
 }
 
@@ -199,9 +155,9 @@ struct MainViewPreview : View {
                 bcc: bccUrls.compactMap { MediaItem.from(urlString: $0) }
             )
         )
-        .environmentObject(ImagePreloader())
-        .environmentObject(NetworkMonitor.shared)
-        .environmentObject(APIService())
+        .environment(ImagePreloader())
+        .environment(NetworkMonitor.shared)
+        .environment(APIService())
     }
 }
 
