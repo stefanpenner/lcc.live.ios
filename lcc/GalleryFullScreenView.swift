@@ -11,6 +11,7 @@ struct GalleryFullScreenView: View {
     @State private var dismissOpacity: Double = 1.0
     @State private var backgroundOpacity: Double = 1.0
     @State private var maxDragDistance: CGFloat = 0
+    @State private var hasTriggeredDismissHaptic: Bool = false
     @Environment(ImagePreloader.self) var preloader
     
     // MARK: - Constants
@@ -210,6 +211,7 @@ struct GalleryFullScreenView: View {
         if !isDragging && translation > 0 && vertical > horizontal * DragConstants.verticalPreferenceRatio {
             isDragging = true
             maxDragDistance = 0
+            hasTriggeredDismissHaptic = false
         }
         
         // Continue tracking if already dragging
@@ -219,7 +221,13 @@ struct GalleryFullScreenView: View {
             }
             
             let dragDistance = max(0, translation)
-            let resistance: CGFloat = dragDistance > DragConstants.dismissalThreshold 
+            #if os(iOS)
+            if !hasTriggeredDismissHaptic && dragDistance > DragConstants.dismissalThreshold {
+                hasTriggeredDismissHaptic = true
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
+            #endif
+            let resistance: CGFloat = dragDistance > DragConstants.dismissalThreshold
                 ? DragConstants.rubberBandResistance 
                 : 1.0
             let effectiveDrag = dragDistance * resistance
@@ -319,7 +327,7 @@ struct ZoomableImageView: View {
                     .clipped()
                     .gesture(magnificationGesture)
                     .onTapGesture(count: 2) {
-                        resetZoom()
+                        toggleZoom()
                     }
                     .gesture(panGesture(minimumDistance: scale > ZoomConstants.minScale ? 0 : ZoomConstants.panMinimumDistance, geometry: geometry))
             }
@@ -370,6 +378,18 @@ struct ZoomableImageView: View {
             scale = ZoomConstants.minScale
             offset = .zero
             lastOffset = .zero
+        }
+    }
+
+    private func toggleZoom() {
+        withAnimation(.spring(response: ZoomConstants.springResponse, dampingFraction: ZoomConstants.springDamping)) {
+            if scale > ZoomConstants.minScale {
+                scale = ZoomConstants.minScale
+                offset = .zero
+                lastOffset = .zero
+            } else {
+                scale = 2.0
+            }
         }
     }
     

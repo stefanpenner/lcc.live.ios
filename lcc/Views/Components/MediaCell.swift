@@ -41,6 +41,7 @@ struct MediaCell: View {
                             .aspectRatio(contentMode: .fill)
                             .frame(width: imageWidth, height: imageHeight)
                             .clipped()
+                            .transition(.opacity.animation(.easeIn(duration: 0.3)))
                             .onTapGesture {
                                 onTap()
                             }

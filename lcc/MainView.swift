@@ -10,7 +10,7 @@ struct MainView: View {
             case .lcc:
                 Label("LCC", systemImage: "mountain.2")
             case .bcc:
-                Label("BCC", systemImage: "mountain.2")
+                Label("BCC", systemImage: "mountain.2.fill")
             }
         }
     }
@@ -22,7 +22,7 @@ struct MainView: View {
 
     @State private var selectedTab: Tab = .lcc
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var gridMode: PhotoTabView.GridMode = .single
+    @AppStorage("gridMode") private var gridMode: PhotoTabView.GridMode = .single
     @State private var fullScreenMedia: PresentedMedia? = nil
     @State private var showConnectionDetails = false
     
@@ -45,6 +45,9 @@ struct MainView: View {
                 mediaItems: items,
                 gridMode: $gridMode,
                 onRequestFullScreen: { media in
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
                     fullScreenMedia = media
                 }
             )
@@ -64,6 +67,9 @@ struct MainView: View {
                     Spacer()
 
                     Button {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                         withAnimation {
                             gridMode = gridMode == .single ? .compact : .single
                         }
